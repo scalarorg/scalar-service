@@ -165,14 +165,6 @@ func BindAndValidate(c echo.Context, i interface{}) error {
 	if err := c.Bind(i); err != nil {
 		err, ok := err.(*echo.HTTPError)
 		if ok {
-			msg := err.Internal.Error()
-
-			flag := strings.Compare(msg, "the provided hex string is not a valid ObjectID") == 0 || strings.Contains(msg, "cannot unmarshal into an ObjectID, the length must be 24")
-
-			if flag {
-				return echo.NewHTTPError(http.StatusBadRequest, "Invalid ID")
-			}
-
 			return err
 		}
 		return echo.NewHTTPError(http.StatusBadRequest, "Invalid input")
