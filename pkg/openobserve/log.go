@@ -11,7 +11,7 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"github.com/tranhuyducseven/goem-template/pkg/utils"
+	"github.com/scalarorg/scalar-service/pkg/utils"
 )
 
 type LogWriter struct {

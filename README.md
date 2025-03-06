@@ -1,4 +1,11 @@
-# Golang with Echo and Mongo Template
+# Scalar API Version 2
+
+
+
+
+
+
+
 
 This is a template for a Golang project using the Echo framework and MongoDB. It includes a basic project structure, configuration, and Docker setup.
 

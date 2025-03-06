@@ -8,9 +8,9 @@ import (
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
-	"github.com/tranhuyducseven/goem-template/config"
-	"github.com/tranhuyducseven/goem-template/pkg/openobserve"
-	"github.com/tranhuyducseven/goem-template/pkg/utils"
+	"github.com/scalarorg/scalar-service/config"
+	"github.com/scalarorg/scalar-service/pkg/openobserve"
+	"github.com/scalarorg/scalar-service/pkg/utils"
 )
 
 type RouteInfo struct {
@@ -22,7 +22,7 @@ type RouteInfo struct {
 
 var RouteRecs map[string][]RouteInfo = make(map[string][]RouteInfo)
 
-const trimModule = "github.com/tranhuyducseven/goem-template/internal/"
+const trimModule = "github.com/scalarorg/scalar-service/internal/"
 
 func setupAddHandlerEvent(e *echo.Echo) {
 	e.OnAddRouteHandler = func(host string, route echo.Route, handler echo.HandlerFunc, middleware []echo.MiddlewareFunc) {

@@ -13,11 +13,8 @@ type ServerEnv struct {
 	ENV             string
 	CORS_WHITE_LIST []string
 
-	APP_NAME         string `validate:"min=1"`
-	API_HOST         string `validate:"min=1"`
-	MONGODB_URI      string `validate:"uri"`
-	MONGODB_DATABASE string `validate:"min=1"`
-	JWT_SECRET       string `validate:"min=10"`
+	APP_NAME string `validate:"min=1"`
+	API_HOST string `validate:"min=1"`
 
 	PORT string `validate:"number"`
 
@@ -25,6 +22,8 @@ type ServerEnv struct {
 	IsStaging bool
 	IsDev     bool
 	IsTest    bool
+
+	POSTGRES_URI string `validate:"uri"`
 
 	OPENOBSERVE_ENDPOINT   string `validate:"url"`
 	OPENOBSERVE_CREDENTIAL string `validate:"min=1"`
@@ -78,15 +77,14 @@ func loadEnv() {
 		ENV:             os.Getenv("ENV"),
 		CORS_WHITE_LIST: corsWhiteList,
 
-		APP_NAME:         os.Getenv("APP_NAME"),
-		API_HOST:         os.Getenv("API_HOST"),
-		MONGODB_URI:      os.Getenv("MONGODB_URI"),
-		MONGODB_DATABASE: os.Getenv("MONGODB_DATABASE"),
-		JWT_SECRET:       os.Getenv("JWT_SECRET"),
-		PORT:             port,
+		APP_NAME: os.Getenv("APP_NAME"),
+		API_HOST: os.Getenv("API_HOST"),
+		PORT:     port,
 
 		OPENOBSERVE_ENDPOINT:   os.Getenv("OPENOBSERVE_ENDPOINT"),
 		OPENOBSERVE_CREDENTIAL: os.Getenv("OPENOBSERVE_CREDENTIAL"),
+
+		POSTGRES_URI: os.Getenv("POSTGRES_URI"),
 	}
 
 	validate := validator.New()

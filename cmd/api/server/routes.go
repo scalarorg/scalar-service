@@ -2,7 +2,7 @@ package server
 
 import (
 	"github.com/labstack/echo/v4"
-	"github.com/tranhuyducseven/goem-template/internal/health"
+	"github.com/scalarorg/scalar-service/internal/health"
 )
 
 func setupRoute(e *echo.Echo) {

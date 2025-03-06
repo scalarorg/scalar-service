@@ -3,8 +3,8 @@ package main
 import (
 	"fmt"
 
-	"github.com/tranhuyducseven/goem-template/cmd/api/server"
-	"github.com/tranhuyducseven/goem-template/config"
+	"github.com/scalarorg/scalar-service/cmd/api/server"
+	"github.com/scalarorg/scalar-service/config"
 )
 
 func main() {

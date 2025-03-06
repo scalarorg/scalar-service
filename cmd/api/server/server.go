@@ -5,9 +5,9 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/rs/zerolog/log"
-	"github.com/tranhuyducseven/goem-template/config"
-	"github.com/tranhuyducseven/goem-template/pkg/db"
-	"github.com/tranhuyducseven/goem-template/pkg/openobserve"
+	"github.com/scalarorg/scalar-service/config"
+	"github.com/scalarorg/scalar-service/pkg/db"
+	"github.com/scalarorg/scalar-service/pkg/openobserve"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
 

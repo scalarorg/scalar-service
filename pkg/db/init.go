@@ -1,46 +1,73 @@
 package db
 
 import (
-	"context"
+	"fmt"
+	"time"
 
-	"github.com/rs/zerolog/log"
-	"github.com/tranhuyducseven/goem-template/config"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"github.com/scalarorg/data-models/chains"
+	"github.com/scalarorg/data-models/scalarnet"
+	"github.com/scalarorg/scalar-service/config"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
-var (
-	client *mongo.Client
-	DB     *mongo.Database
-
-	User *mongo.Collection
-)
+var DB *gorm.DB
 
 func Init() {
-	serverAPI := options.ServerAPI(options.ServerAPIVersion1)
-	opts := options.Client().ApplyURI(config.Env.MONGODB_URI).SetServerAPIOptions(serverAPI)
-	// Create a new client and connect to the server
-	var err error
-	client, err = mongo.Connect(context.TODO(), opts)
+	db, err := gorm.Open(postgres.Open(config.Env.POSTGRES_URI), &gorm.Config{
+		Logger: logger.Default.LogMode(logger.Info),
+		NowFunc: func() time.Time {
+			return time.Now().UTC()
+		},
+	})
 	if err != nil {
-		panic(err)
+		panic(fmt.Sprintf("failed to connect to database: %+v", err))
 	}
 
-	var result bson.M
-	if err := client.Database("admin").RunCommand(context.TODO(), bson.M{"ping": 1}).Decode(&result); err != nil {
-		panic(err)
+	sqlDB, err := db.DB()
+	if err != nil {
+		panic(fmt.Sprintf("failed to get database instance: %+v", err))
 	}
 
-	DB = client.Database(config.Env.MONGODB_DATABASE)
+	sqlDB.SetMaxIdleConns(10)
+	sqlDB.SetMaxOpenConns(100)
+	sqlDB.SetConnMaxLifetime(time.Hour)
 
-	User = DB.Collection("users")
-	log.Info().Msg("Connected to MongoDB!")
+	DB = db
+
+	runMigrations()
 }
 
 func Close() {
-	if err := client.Disconnect(context.TODO()); err != nil {
-		panic(err)
+	sqlDB, err := DB.DB()
+	if err != nil {
+		panic(fmt.Sprintf("failed to get database instance: %+v", err))
 	}
-	log.Info().Msg("Connection to MongoDB closed.")
+
+	if err := sqlDB.Close(); err != nil {
+		panic(fmt.Sprintf("failed to close database: %+v", err))
+	}
+}
+
+func runMigrations() {
+	models := []interface{}{
+		&chains.MintCommand{},
+		&chains.CommandExecuted{},
+		&chains.ContractCall{},
+		&chains.ContractCallWithToken{},
+		&chains.TokenSent{},
+		&scalarnet.Command{},
+		&scalarnet.BatchCommand{},
+		&scalarnet.EventCheckPoint{},
+		&scalarnet.CallContract{},
+		&scalarnet.CallContractWithToken{},
+		&scalarnet.ContractCallApproved{},
+		&scalarnet.ContractCallApprovedWithMint{},
+		&scalarnet.TokenSentApproved{},
+	}
+
+	if err := DB.AutoMigrate(models...); err != nil {
+		panic(fmt.Sprintf("failed to run migrations: %+v", err))
+	}
 }

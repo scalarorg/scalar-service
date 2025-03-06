@@ -6,7 +6,7 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"github.com/tranhuyducseven/goem-template/pkg/openobserve"
+	"github.com/scalarorg/scalar-service/pkg/openobserve"
 )
 
 func InitLogger() {
@@ -24,13 +24,8 @@ func InitLogger() {
 	o2Writer := openobserve.NewLogWriter(zerolog.InfoLevel)
 	consoleWriter := zerolog.ConsoleWriter{Out: os.Stderr}
 
-	if Env.IsProd || Env.IsStaging {
-		subWriters = append(subWriters, os.Stdout)
-		subWriters = append(subWriters, o2Writer)
-	} else {
-		subWriters = append(subWriters, consoleWriter)
-		subWriters = append(subWriters, o2Writer)
-	}
+	subWriters = append(subWriters, consoleWriter)
+	subWriters = append(subWriters, o2Writer)
 
 	if len(subWriters) >= 1 {
 		writer = zerolog.MultiLevelWriter(subWriters...)

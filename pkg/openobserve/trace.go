@@ -23,7 +23,7 @@ import (
 const (
 	tracerKey = "tracer"
 	// ScopeName is the instrumentation scope name.
-	ScopeName = "github.com/tranhuyducseven/goem-template"
+	ScopeName = "github.com/scalarorg/scalar-service"
 )
 
 var Tracer oteltrace.Tracer
