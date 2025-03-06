@@ -1,0 +1,26 @@
+services:
+  mongo:
+    image: mongo:latest
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: helloworld
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo:/data/db
+
+  openobserve:
+    image: public.ecr.aws/zinclabs/openobserve:latest
+    restart: unless-stopped
+    environment:
+      ZO_ROOT_USER_EMAIL: "root@gmail.com"
+      ZO_ROOT_USER_PASSWORD: "helloworld"
+    ports:
+      - "5080:5080"
+    volumes:
+      - data:/data
+
+volumes:
+  data:
+  mongo:
