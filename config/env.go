@@ -14,7 +14,6 @@ type ServerEnv struct {
 	CORS_WHITE_LIST []string
 
 	APP_NAME string `validate:"min=1"`
-	API_HOST string `validate:"min=1"`
 
 	PORT string `validate:"number"`
 
@@ -78,7 +77,6 @@ func loadEnv() {
 		CORS_WHITE_LIST: corsWhiteList,
 
 		APP_NAME: os.Getenv("APP_NAME"),
-		API_HOST: os.Getenv("API_HOST"),
 		PORT:     port,
 
 		OPENOBSERVE_ENDPOINT:   os.Getenv("OPENOBSERVE_ENDPOINT"),
