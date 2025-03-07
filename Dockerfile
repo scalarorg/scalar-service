@@ -1,4 +1,4 @@
-ARG GO_VERSION=1.22.2
+ARG GO_VERSION=1.23.3
 
 # Builder stage
 FROM golang:${GO_VERSION} as builder

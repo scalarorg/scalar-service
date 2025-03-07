@@ -8,6 +8,7 @@ import (
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
+	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/scalar-service/config"
 	"github.com/scalarorg/scalar-service/pkg/openobserve"
 	"github.com/scalarorg/scalar-service/pkg/utils"
@@ -66,11 +67,12 @@ func setupAddHandlerEvent(e *echo.Echo) {
 }
 
 func setupMiddleware(e *echo.Echo) {
+	log.Info().Any("CORS", config.Env.CORS_WHITE_LIST).Msg("setupMiddleware")
 	e.Use(middleware.Recover())
 	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
-		AllowOrigins:     config.Env.CORS_WHITE_LIST,
-		AllowCredentials: true,
-		AllowMethods:     []string{echo.GET, echo.HEAD, echo.PUT, echo.PATCH, echo.POST, echo.DELETE},
+		AllowOrigins: config.Env.CORS_WHITE_LIST,
+		AllowMethods: []string{echo.GET, echo.HEAD, echo.PUT, echo.PATCH, echo.POST, echo.DELETE},
+		AllowHeaders: []string{echo.HeaderOrigin, echo.HeaderContentType, echo.HeaderAccept, echo.HeaderAuthorization},
 	}))
 	e.Use(openobserve.Middleware())
 	e.Use(utils.RequestLogMiddleware())

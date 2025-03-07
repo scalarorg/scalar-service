@@ -16,7 +16,7 @@ var DB *gorm.DB
 
 func Init() {
 	db, err := gorm.Open(postgres.Open(config.Env.POSTGRES_URI), &gorm.Config{
-		Logger: logger.Default.LogMode(logger.Info),
+		Logger: logger.Default.LogMode(logger.Silent),
 		NowFunc: func() time.Time {
 			return time.Now().UTC()
 		},
