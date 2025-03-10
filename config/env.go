@@ -22,7 +22,8 @@ type ServerEnv struct {
 	IsDev     bool
 	IsTest    bool
 
-	POSTGRES_URI string `validate:"uri"`
+	RELAYER_DB_URI string `validate:"uri"`
+	INDEXER_DB_URI string `validate:"uri"`
 
 	OPENOBSERVE_ENDPOINT   string `validate:"url"`
 	OPENOBSERVE_CREDENTIAL string `validate:"min=1"`
@@ -82,7 +83,8 @@ func loadEnv() {
 		OPENOBSERVE_ENDPOINT:   os.Getenv("OPENOBSERVE_ENDPOINT"),
 		OPENOBSERVE_CREDENTIAL: os.Getenv("OPENOBSERVE_CREDENTIAL"),
 
-		POSTGRES_URI: os.Getenv("POSTGRES_URI"),
+		RELAYER_DB_URI: os.Getenv("RELAYER_DB_URI"),
+		INDEXER_DB_URI: os.Getenv("INDEXER_DB_URI"),
 	}
 
 	validate := validator.New()

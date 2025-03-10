@@ -4,8 +4,9 @@ func CreateCrossChainDocument(sent ExpectedCrossChainDocument) *CrossChainDocume
 	return &CrossChainDocument{
 		ID:          sent.GetID(),
 		Type:        sent.GetType(),
-		Status:      string(sent.GetType()),
+		Status:      sent.GetStatus(),
 		Source:      sent.GetSource(),
 		Destination: sent.GetDestination(),
+		CommandID:   sent.GetCommandID(),
 	}
 }

@@ -4,6 +4,9 @@ import (
 	"context"
 	"fmt"
 	"time"
+
+	"github.com/scalarorg/bitcoin-vault/go-utils/chain"
+	"github.com/scalarorg/data-models/chains"
 )
 
 type BridgeTxsResult struct {
@@ -11,7 +14,6 @@ type BridgeTxsResult struct {
 	EventID              string `gorm:"column:event_id"`
 	TxHash               string `gorm:"column:tx_hash"`
 	BlockNumber          uint64 `gorm:"column:block_number"`
-	LogIndex             uint   `gorm:"column:log_index"`
 	SourceChain          string `gorm:"column:source_chain"`
 	SourceAddress        string `gorm:"column:source_address"`
 	DestinationChain     string `gorm:"column:destination_chain"`
@@ -22,13 +24,11 @@ type BridgeTxsResult struct {
 	Status               string `gorm:"column:status"`
 
 	// TokenSentApproved specific fields
-	CommandId  string `gorm:"column:command_id"`
-	TransferID uint64 `gorm:"column:transfer_id"`
+	CommandID string `gorm:"column:command_id"`
 
 	// CommandExecuted specific fields
 	ExecutedTxHash      string `gorm:"column:executed_tx_hash"`
 	ExecutedBlockNumber uint64 `gorm:"column:executed_block_number"`
-	ExecutedLogIndex    uint   `gorm:"column:executed_log_index"`
 	ExecutedAddress     string `gorm:"column:executed_address"`
 
 	CreatedAt                time.Time `gorm:"column:created_at"`
@@ -47,16 +47,12 @@ func ListBridgeTxs(ctx context.Context, size, offset int) ([]BridgeTxsResult, in
 		offset = 0
 	}
 
-	query := DB.Table("token_sents ts").
+	query := DB.Relayer.Table("token_sents ts").
 		Select(`
         ts.*,
-        tsa.tx_hash as approved_tx_hash,
-        tsa.log_index as approved_log_index,
-        tsa.command_id,
-        tsa.transfer_id,
-        ce.tx_hash as executed_tx_hash,
+		ce.command_id,
+		ce.tx_hash as executed_tx_hash,
         ce.block_number as executed_block_number,
-        ce.log_index as executed_log_index,
         ce.address as executed_address,
 		ce.created_at as executed_created_at
     `).
@@ -95,20 +91,26 @@ func (b *BridgeTxsResult) GetStatus() string {
 }
 
 func (b *BridgeTxsResult) GetSource() *SourceDocument {
+	var c = &chain.ChainInfo{}
+	var name = ""
+	err := c.FromString(b.DestinationChain)
+	if err != nil {
+		name = b.DestinationChain
+	} else {
+		name = chain.GetDisplayedName(*c)
+	}
 	return &SourceDocument{
 		BaseDocument: &BaseDocument{
-			Chain: b.SourceChain,
-			// TODO:
-			ChainName: "b.ChainName",
+			Chain:     b.SourceChain,
+			ChainName: name,
 			TxHash:    b.TxHash,
-
-			Status: b.Status,
-			Value:  fmt.Sprintf("%d", b.Amount),
-			Fee:    "0",
+			Status:    b.Status,
+			Value:     fmt.Sprintf("%d", b.Amount),
+			Fee:       "0",
 			// TODO: fix token
 			CrossChainAsset: CrossChainAsset{
-				// TODO:
-				Name:     "b.Symbol",
+				// TODO: queyr in chains
+				Name:     b.Symbol,
 				Symbol:   b.Symbol,
 				Address:  b.TokenContractAddress,
 				Decimals: 8,
@@ -123,20 +125,33 @@ func (b *BridgeTxsResult) GetSource() *SourceDocument {
 }
 
 func (b *BridgeTxsResult) GetDestination() *DestinationDocument {
+	var c = &chain.ChainInfo{}
+	var name = ""
+	err := c.FromString(b.DestinationChain)
+	if err != nil {
+		name = b.DestinationChain
+	} else {
+		name = chain.GetDisplayedName(*c)
+	}
+
+	var status = chains.TokenSentStatusPending
+	if b.TxHash != "" && b.ExecutedTxHash != "" {
+		status = chains.TokenSentStatusSuccess
+	}
+
 	return &DestinationDocument{
 		BaseDocument: &BaseDocument{
-			Chain: b.DestinationChain,
-			// TODO:
-			ChainName: "b.ChainName",
+			Chain:     b.DestinationChain,
+			ChainName: name,
 			TxHash:    b.ExecutedTxHash,
 
 			// TODO: use token approved status or executed status
-			Status: b.Status,
+			Status: string(status),
 			Value:  fmt.Sprintf("%d", b.Amount),
 			Fee:    "0",
 			CrossChainAsset: CrossChainAsset{
-				// TODO:
-				Name:     "b.Symbol",
+				// TODO: query in chains to get token info
+				Name:     b.Symbol,
 				Symbol:   b.Symbol,
 				Address:  b.TokenContractAddress,
 				Decimals: 8,
@@ -148,4 +163,8 @@ func (b *BridgeTxsResult) GetDestination() *DestinationDocument {
 		},
 		Receiver: b.DestinationAddress,
 	}
+}
+
+func (b *BridgeTxsResult) GetCommandID() string {
+	return b.CommandID
 }
