@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/scalarorg/data-models/chains"
-	"github.com/scalarorg/data-models/scalarnet"
 	"github.com/scalarorg/scalar-service/config"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -22,7 +20,7 @@ var DB = &DBManager{}
 func Init() {
 	DB.Relayer = connect(config.Env.RELAYER_DB_URI)
 	DB.Indexer = connect(config.Env.INDEXER_DB_URI)
-	runMigrations()
+	// runMigrations()
 }
 
 func Close() error {
@@ -45,33 +43,33 @@ func (db *DBManager) Close() error {
 	return nil
 }
 
-func runMigrations() {
-	models := []interface{}{
-		&chains.MintCommand{},
-		&chains.CommandExecuted{},
-		&chains.ContractCall{},
-		&chains.ContractCallWithToken{},
-		&chains.TokenSent{},
-		&scalarnet.TokenSentApproved{},
-		&scalarnet.Command{},
-		&scalarnet.BatchCommand{},
-		&scalarnet.EventCheckPoint{},
-		&scalarnet.CallContract{},
-		&scalarnet.CallContractWithToken{},
-		&scalarnet.ContractCallApproved{},
-		&scalarnet.ContractCallApprovedWithMint{},
-	}
+// func runMigrations() {
+// 	models := []interface{}{
+// 		&chains.MintCommand{},
+// 		&chains.CommandExecuted{},
+// 		&chains.ContractCall{},
+// 		&chains.ContractCallWithToken{},
+// 		&chains.TokenSent{},
+// 		&scalarnet.TokenSentApproved{},
+// 		&scalarnet.Command{},
+// 		&scalarnet.BatchCommand{},
+// 		&scalarnet.EventCheckPoint{},
+// 		&scalarnet.CallContract{},
+// 		&scalarnet.CallContractWithToken{},
+// 		&scalarnet.ContractCallApproved{},
+// 		&scalarnet.ContractCallApprovedWithMint{},
+// 	}
 
-	if err := DB.Relayer.AutoMigrate(models...); err != nil {
-		panic(fmt.Sprintf("failed to run migrations: %+v", err))
-	}
+// 	if err := DB.Relayer.AutoMigrate(models...); err != nil {
+// 		panic(fmt.Sprintf("failed to run migrations: %+v", err))
+// 	}
 
-	// TODO: Run indexer migrations
-}
+// 	// TODO: Run indexer migrations
+// }
 
 func connect(connectionString string) *gorm.DB {
 	db, err := gorm.Open(postgres.Open(connectionString), &gorm.Config{
-		Logger: logger.Default.LogMode(logger.Silent),
+		Logger: logger.Default.LogMode(logger.Info),
 		NowFunc: func() time.Time {
 			return time.Now().UTC()
 		},

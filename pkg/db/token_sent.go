@@ -7,9 +7,26 @@ import (
 
 	"github.com/scalarorg/bitcoin-vault/go-utils/chain"
 	"github.com/scalarorg/data-models/chains"
+	"github.com/scalarorg/scalar-service/config"
+	"gorm.io/gorm"
 )
 
-type BridgeTxsResult struct {
+func BuildTokenSentBaseQuery(db *gorm.DB, where func(db *gorm.DB) *gorm.DB) *gorm.DB {
+	query := db.Table("token_sents ts").
+		Select(`
+            ts.*,
+            ce.command_id,
+            ce.tx_hash as executed_tx_hash,
+            ce.block_number as executed_block_number,
+            ce.address as executed_address,
+            ce.created_at as executed_created_at
+        `)
+	query = where(query)
+	return query.Joins("LEFT JOIN token_sent_approveds tsa ON ts.event_id = tsa.event_id").
+		Joins("LEFT JOIN command_executeds ce ON tsa.command_id = ce.command_id")
+}
+
+type TokenSentsResult struct {
 	// TokenSent fields
 	EventID              string `gorm:"column:event_id"`
 	TxHash               string `gorm:"column:tx_hash"`
@@ -35,62 +52,25 @@ type BridgeTxsResult struct {
 	ExecutedCommandCreatedAt time.Time `gorm:"column:executed_created_at"`
 }
 
-func ListBridgeTxs(ctx context.Context, size, offset int) ([]BridgeTxsResult, int, error) {
-	var results []BridgeTxsResult
+var _ (ExpectedCrossChainDocument) = (*TokenSentsResult)(nil)
 
-	var totalCount int64
-
-	if size <= 0 {
-		size = 10
-	}
-	if offset < 0 {
-		offset = 0
-	}
-
-	query := DB.Relayer.Table("token_sents ts").
-		Select(`
-        ts.*,
-		ce.command_id,
-		ce.tx_hash as executed_tx_hash,
-        ce.block_number as executed_block_number,
-        ce.address as executed_address,
-		ce.created_at as executed_created_at
-    `).
-		Joins("LEFT JOIN token_sent_approveds tsa ON ts.event_id = tsa.event_id").
-		Joins("LEFT JOIN command_executeds ce ON tsa.command_id = ce.command_id")
-
-	if err := query.Count(&totalCount).Error; err != nil {
-		return nil, 0, err
-	}
-
-	err := query.
-		Order("created_at DESC").
-		Offset(offset).
-		Limit(size).
-		Find(&results).Error
-
-	if err != nil {
-		return nil, 0, err
-	}
-
-	return results, int(totalCount), nil
-}
-
-var _ (ExpectedCrossChainDocument) = (*BridgeTxsResult)(nil)
-
-func (b *BridgeTxsResult) GetID() string {
+func (b *TokenSentsResult) GetID() string {
 	return b.EventID
 }
 
-func (b *BridgeTxsResult) GetType() CrossChainTx {
-	return CrossChainTxBridge
+func (b *TokenSentsResult) GetType() CrossChainTx {
+	typ := CrossChainTxBridge
+	if b.SourceChain != config.Env.BITCOIN_CHAIN_ID {
+		typ = CrossChainTxTransfer
+	}
+	return typ
 }
 
-func (b *BridgeTxsResult) GetStatus() string {
+func (b *TokenSentsResult) GetStatus() string {
 	return b.Status
 }
 
-func (b *BridgeTxsResult) GetSource() *SourceDocument {
+func (b *TokenSentsResult) GetSource() *SourceDocument {
 	var c = &chain.ChainInfo{}
 	var name = ""
 	err := c.FromString(b.DestinationChain)
@@ -124,7 +104,7 @@ func (b *BridgeTxsResult) GetSource() *SourceDocument {
 	}
 }
 
-func (b *BridgeTxsResult) GetDestination() *DestinationDocument {
+func (b *TokenSentsResult) GetDestination() *DestinationDocument {
 	var c = &chain.ChainInfo{}
 	var name = ""
 	err := c.FromString(b.DestinationChain)
@@ -165,6 +145,51 @@ func (b *BridgeTxsResult) GetDestination() *DestinationDocument {
 	}
 }
 
-func (b *BridgeTxsResult) GetCommandID() string {
+func (b *TokenSentsResult) GetCommandID() string {
 	return b.CommandID
+}
+
+func AggregateTokenSents(ctx context.Context, query *gorm.DB, size, offset int) ([]TokenSentsResult, int, error) {
+	var results []TokenSentsResult
+
+	var totalCount int64
+
+	if size <= 0 {
+		size = 10
+	}
+	if offset < 0 {
+		offset = 0
+	}
+
+	if err := query.Count(&totalCount).Error; err != nil {
+		return nil, 0, err
+	}
+
+	err := query.
+		Order("created_at DESC").
+		Offset(offset).
+		Limit(size).
+		Find(&results).Error
+
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return results, int(totalCount), nil
+}
+
+func ListTransferTxs(ctx context.Context, size, offset int) ([]TokenSentsResult, int, error) {
+	query := BuildTokenSentBaseQuery(DB.Relayer, func(db *gorm.DB) *gorm.DB {
+		return db.Where("ts.source_chain <> ?", config.Env.BITCOIN_CHAIN_ID)
+	})
+
+	return AggregateTokenSents(ctx, query, size, offset)
+}
+
+func ListBridgeTxs(ctx context.Context, size, offset int) ([]TokenSentsResult, int, error) {
+	query := BuildTokenSentBaseQuery(DB.Relayer, func(db *gorm.DB) *gorm.DB {
+		return db.Where("ts.source_chain = ?", config.Env.BITCOIN_CHAIN_ID)
+	})
+
+	return AggregateTokenSents(ctx, query, size, offset)
 }

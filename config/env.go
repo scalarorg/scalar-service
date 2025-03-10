@@ -27,6 +27,8 @@ type ServerEnv struct {
 
 	OPENOBSERVE_ENDPOINT   string `validate:"url"`
 	OPENOBSERVE_CREDENTIAL string `validate:"min=1"`
+
+	BITCOIN_CHAIN_ID string `validate:"min=4"`
 }
 
 var Env ServerEnv
@@ -83,8 +85,9 @@ func loadEnv() {
 		OPENOBSERVE_ENDPOINT:   os.Getenv("OPENOBSERVE_ENDPOINT"),
 		OPENOBSERVE_CREDENTIAL: os.Getenv("OPENOBSERVE_CREDENTIAL"),
 
-		RELAYER_DB_URI: os.Getenv("RELAYER_DB_URI"),
-		INDEXER_DB_URI: os.Getenv("INDEXER_DB_URI"),
+		RELAYER_DB_URI:   os.Getenv("RELAYER_DB_URI"),
+		INDEXER_DB_URI:   os.Getenv("INDEXER_DB_URI"),
+		BITCOIN_CHAIN_ID: os.Getenv("BITCOIN_CHAIN_ID"),
 	}
 
 	validate := validator.New()
