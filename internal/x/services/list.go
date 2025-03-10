@@ -3,8 +3,6 @@ package services
 import (
 	"context"
 
-	"github.com/rs/zerolog/log"
-	"github.com/scalarorg/data-models/chains"
 	"github.com/scalarorg/scalar-service/pkg/db"
 	"github.com/scalarorg/scalar-service/pkg/utils"
 )
@@ -16,13 +14,16 @@ type ListOptions struct {
 }
 
 func List(ctx context.Context, options *ListOptions) ([]*db.CrossChainDocument, int, error) {
-	txs, count, err := db.ListCrossChainTxs[chains.TokenSent](ctx, options.Size, options.Offset)
-	if err != nil {
-		return nil, 0, err
+	if options.Type == "bridge" {
+		bridgeTxs, count, err := db.ListBridgeTxs(ctx, options.Size, options.Offset)
+		if err != nil {
+			return nil, 0, err
+		}
+
+		list := utils.Map(bridgeTxs, func(tx db.BridgeTxsResult) *db.CrossChainDocument { return db.CreateCrossChainDocument(&tx) })
+		return list, count, nil
 	}
 
-	log.Info().Msgf("Found %d cross chain transactions", count)
+	return nil, 0, nil
 
-	list := utils.Map(txs, func(tx chains.TokenSent) *db.CrossChainDocument { return db.CreateCrossChainDocument(&tx) })
-	return list, count, nil
 }

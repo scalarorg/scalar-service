@@ -57,6 +57,7 @@ func runMigrations() {
 		&chains.ContractCall{},
 		&chains.ContractCallWithToken{},
 		&chains.TokenSent{},
+		&scalarnet.TokenSentApproved{},
 		&scalarnet.Command{},
 		&scalarnet.BatchCommand{},
 		&scalarnet.EventCheckPoint{},
@@ -64,7 +65,6 @@ func runMigrations() {
 		&scalarnet.CallContractWithToken{},
 		&scalarnet.ContractCallApproved{},
 		&scalarnet.ContractCallApprovedWithMint{},
-		&scalarnet.TokenSentApproved{},
 	}
 
 	if err := DB.AutoMigrate(models...); err != nil {
