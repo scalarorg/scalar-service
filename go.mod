@@ -6,7 +6,7 @@ require (
 	github.com/go-playground/validator/v10 v10.20.0
 	github.com/joho/godotenv v1.5.1
 	github.com/labstack/echo/v4 v4.12.0
-	github.com/rs/zerolog v1.32.0
+	github.com/rs/zerolog v1.33.0
 	github.com/scalarorg/bitcoin-vault/go-utils v0.0.0-20250310064425-cb230c1ce13a
 	github.com/scalarorg/data-models v0.0.0-20250206065052-ce4e7fe3b6cc
 	go.mongodb.org/mongo-driver v1.15.0
