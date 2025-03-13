@@ -62,3 +62,46 @@ func GetTokenStats(timeBucket string) ([]TokenSentStats, error) {
 	}
 	return stats, nil
 }
+
+func GetTotalTxs() (int64, error) {
+	var totalTxs int64
+	query := `
+		SELECT
+			COUNT(*) as total_txs
+		FROM event_token_sents
+	`
+	err := DB.Indexer.Raw(query).Scan(&totalTxs).Error
+	if err != nil {
+		return 0, fmt.Errorf("failed to fetch total txs: %w", err)
+	}
+	return totalTxs, nil
+}
+
+func GetTotalBridgedVolumes(chain string) (int64, error) {
+	var totalVolumes int64
+	query := `
+		SELECT
+			SUM(asset_amount) as total_volumes
+		FROM event_token_sents
+		WHERE chain = ?
+	`
+	err := DB.Indexer.Raw(query, chain).Scan(&totalVolumes).Error
+	if err != nil {
+		return 0, fmt.Errorf("failed to fetch total volumes: %w", err)
+	}
+	return totalVolumes, nil
+}
+
+func GetTotalUsers() (int64, error) {
+	var totalUsers int64
+	query := `
+		SELECT
+			COUNT(DISTINCT sender) as total_users
+		FROM event_token_sents
+	`
+	err := DB.Indexer.Raw(query).Scan(&totalUsers).Error
+	if err != nil {
+		return 0, fmt.Errorf("failed to fetch total users: %w", err)
+	}
+	return totalUsers, nil
+}

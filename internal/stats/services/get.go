@@ -3,10 +3,14 @@ package services
 import (
 	"context"
 
+	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/scalar-service/pkg/db"
+	"github.com/scalarorg/scalar-service/pkg/types"
 )
 
 type StatsOpts struct {
+	Limit      int    `query:"limit" validate:"omitempty,min=1,max=100"`
+	Network    string `query:"network" validate:"omitempty,oneof=mainnet testnet"`
 	TimeBucket string `query:"time_bucket" validate:"omitempty,oneof=hour day week month"`
 }
 
@@ -16,18 +20,30 @@ type StatsPayload struct {
 }
 
 type StatsResponse struct {
-	Txs         []*StatsPayload `json:"txs"`
-	Volumes     []*StatsPayload `json:"volumes"`
-	ActiveUsers []*StatsPayload `json:"active_users"`
-	NewUsers    []*StatsPayload `json:"new_users"`
+	TotalTxs                     int64                  `json:"total_txs"`
+	TotalVolumes                 int64                  `json:"total_volumes"`
+	TotalUsers                   int64                  `json:"total_users"`
+	Txs                          []*StatsPayload        `json:"txs"`
+	Volumes                      []*StatsPayload        `json:"volumes"`
+	ActiveUsers                  []*StatsPayload        `json:"active_users"`
+	NewUsers                     []*StatsPayload        `json:"new_users"`
+	TopUsers                     []types.AddressAmount  `json:"top_users"`
+	TopBridges                   []*types.AddressAmount `json:"top_bridges"`
+	TopSourceChainsByVolume      []*types.ChainAmount   `json:"top_source_chains_by_volume"`
+	TopDestinationChainsByVolume []*types.ChainAmount   `json:"top_destination_chains_by_volume"`
+	TopPathsByVolume             []*types.PathAmount    `json:"top_paths_by_volume"`
+	TopSourceChainsByTx          []*types.ChainAmount   `json:"top_source_chains_by_tx"`
+	TopDestinationChainsByTx     []*types.ChainAmount   `json:"top_destination_chains_by_tx"`
+	TopPathsByTx                 []*types.PathAmount    `json:"top_paths_by_tx"`
 }
 
+// Todo: Consider using graphql for seperate stat request
 func GetStats(ctx context.Context, opts *StatsOpts) (*StatsResponse, error) {
 	cmds, err := db.GetCommandStats(ctx, opts.TimeBucket)
 	if err != nil {
 		return nil, err
 	}
-
+	response := &StatsResponse{}
 	tokenSentSats, err := db.GetTokenStats(opts.TimeBucket)
 	if err != nil {
 		return nil, err
@@ -62,10 +78,70 @@ func GetStats(ctx context.Context, opts *StatsOpts) (*StatsResponse, error) {
 		})
 	}
 
-	return &StatsResponse{
-		Txs:         txs,
-		Volumes:     volumes,
-		ActiveUsers: activeUsers,
-		NewUsers:    newUsers,
-	}, nil
+	response.Txs = txs
+	response.Volumes = volumes
+	response.ActiveUsers = activeUsers
+	response.NewUsers = newUsers
+	response = GetOverallStats(ctx, opts, response)
+	response = GetVolumeStats(ctx, opts, response)
+	response = GetTransactionStats(ctx, opts, response)
+	return response, nil
+}
+func GetOverallStats(ctx context.Context, opts *StatsOpts, response *StatsResponse) *StatsResponse {
+	totalTxs, err := db.GetTotalTxs()
+	if err != nil {
+		log.Error().Err(err).Msg("failed to get total txs")
+	}
+	response.TotalTxs = totalTxs
+	response.TotalVolumes, err = db.GetTotalBridgedVolumes(opts.Network)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to get total volumes")
+	}
+	response.TotalUsers, err = db.GetTotalUsers()
+	if err != nil {
+		log.Error().Err(err).Msg("failed to get total users")
+	}
+	return response
+}
+
+func GetVolumeStats(ctx context.Context, opts *StatsOpts, response *StatsResponse) *StatsResponse {
+	var err error
+	response.TopUsers, err = db.GetTopTransferUsers(opts.Limit)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to get top transfer users")
+	}
+	response.TopBridges, err = db.GetTopBridgeUsers(opts.Network, opts.Limit)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to get top bridge users")
+	}
+	response.TopSourceChainsByVolume, err = db.StatVolumeBySourceChain(opts.Limit)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to get top source chains by volume")
+	}
+	response.TopDestinationChainsByVolume, err = db.StatVolumeByDestinationChain(opts.Limit)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to get top destination chains by volume")
+	}
+	response.TopPathsByVolume, err = db.StatVolumeByPath(opts.Limit)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to get top paths by volume")
+	}
+	return response
+}
+
+func GetTransactionStats(ctx context.Context, opts *StatsOpts, response *StatsResponse) *StatsResponse {
+	var err error
+	response.TopSourceChainsByTx, err = db.StatTransactionBySourceChain(opts.Limit)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to get top source chains by tx")
+	}
+	response.TopDestinationChainsByTx, err = db.StatTransactionByDestinationChain(opts.Limit)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to get top destination chains by tx")
+	}
+	response.TopPathsByTx, err = db.StatTransactionByPath(opts.Limit)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to get top paths by tx")
+	}
+	return response
 }
