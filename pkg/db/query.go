@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/scalarorg/scalar-service/config"
 	"gorm.io/gorm"
@@ -74,6 +75,18 @@ func ListTransferTxs(ctx context.Context, size, offset int) ([]BaseCrossChainTxR
 	return AggregateCrossChainTxs(ctx, query, size, offset)
 }
 
+func GetTransferTx(ctx context.Context, txHash string) (*BaseCrossChainTxResult, error) {
+	var result BaseCrossChainTxResult
+
+	query := BuildTokenSentsBaseQuery(DB.Relayer, func(db *gorm.DB) {
+		db.Where("ts.source_chain <> ?", config.Env.BITCOIN_CHAIN_ID)
+	})
+
+	err := query.Where("ts.tx_hash = ?", txHash).First(&result).Error
+
+	return &result, err
+}
+
 func ListBridgeTxs(ctx context.Context, size, offset int) ([]BaseCrossChainTxResult, int, error) {
 	query := BuildTokenSentsBaseQuery(DB.Relayer, func(db *gorm.DB) {
 		db.Where("ts.source_chain = ?", config.Env.BITCOIN_CHAIN_ID)
@@ -82,10 +95,36 @@ func ListBridgeTxs(ctx context.Context, size, offset int) ([]BaseCrossChainTxRes
 	return AggregateCrossChainTxs(ctx, query, size, offset)
 }
 
+func GetBridgeTx(ctx context.Context, txHash string) (*BaseCrossChainTxResult, error) {
+	var result BaseCrossChainTxResult
+
+	query := BuildTokenSentsBaseQuery(DB.Relayer, func(db *gorm.DB) {
+		db.Where("ts.source_chain = ?", config.Env.BITCOIN_CHAIN_ID)
+	})
+
+	fmt.Println("query", query)
+
+	err := query.Where("ts.tx_hash = ?", txHash).First(&result).Error
+
+	return &result, err
+}
+
 func ListRedeemTxs(ctx context.Context, size, offset int) ([]BaseCrossChainTxResult, int, error) {
 	query := BuildContractCallWithTokenBaseQuery(DB.Relayer, func(db *gorm.DB) {
 		db.Where("ccwtk.destination_chain = ?", config.Env.BITCOIN_CHAIN_ID)
 	})
 
 	return AggregateCrossChainTxs(ctx, query, size, offset)
+}
+
+func GetRedeemTx(ctx context.Context, txHash string) (*BaseCrossChainTxResult, error) {
+	var result BaseCrossChainTxResult
+
+	query := BuildContractCallWithTokenBaseQuery(DB.Relayer, func(db *gorm.DB) {
+		db.Where("ccwtk.destination_chain = ?", config.Env.BITCOIN_CHAIN_ID)
+	})
+
+	err := query.Where("ccwtk.tx_hash = ?", txHash).First(&result).Error
+
+	return &result, err
 }

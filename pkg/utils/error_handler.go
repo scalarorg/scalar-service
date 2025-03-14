@@ -3,9 +3,9 @@ package utils
 import (
 	"net/http"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/labstack/echo/v4"
 	"github.com/rs/zerolog/log"
-	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type ErrResponse struct {
@@ -28,8 +28,8 @@ func HttpErrorHandler(err error, c echo.Context) {
 			c.JSON(m.Code, ErrResponse{Message: mType.Error()})
 		}
 	} else {
-		log.Err(err).Msg("http error")
-		if err == mongo.ErrNoDocuments {
+		log.Error().Str("err", err.Error()).Msg("http error")
+		if err == pgx.ErrNoRows || err.Error() == "record not found" {
 			c.JSON(http.StatusNotFound, ErrResponse{
 				Message: "Resource not found",
 			})
