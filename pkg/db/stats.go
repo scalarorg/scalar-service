@@ -18,7 +18,7 @@ func GetCommandStats(ctx context.Context, timeBucket string) ([]Stats, error) {
 	err := DB.Relayer.Table("commands").
 		Select("time_bucket(? :: interval, created_at) as bucket_time, COUNT(*) as count", interval).
 		Group("bucket_time").
-		Order("bucket_time DESC").
+		Order("bucket_time ASC").
 		Find(&stats).Error
 
 	if err != nil {
@@ -54,7 +54,7 @@ func GetTokenStats(timeBucket string) ([]TokenSentStats, error) {
 			GROUP BY source_address
 		) as first_seen ON ts.source_address = first_seen.source_address
 		GROUP BY bucket_time
-		ORDER BY bucket_time DESC
+		ORDER BY bucket_time ASC 
 	`, interval).Scan(&stats).Error
 
 	if err != nil {
