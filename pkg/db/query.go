@@ -112,9 +112,16 @@ func GetBridgeTx(ctx context.Context, txHash string) (*BaseCrossChainTxResult, e
 }
 
 func ListRedeemTxs(ctx context.Context, size, offset int) ([]BaseCrossChainTxResult, int, error) {
-	query := BuildContractCallWithTokenBaseQuery(DB.Relayer, func(db *gorm.DB) {
-		db.Where("ccwtk.destination_chain = ?", config.Env.BITCOIN_CHAIN_ID)
-	})
+	query := DB.Relayer.Table("contract_call_with_tokens ccwtk").
+		Select(`
+            ccwtk.*,
+            ccwtk.tx_hash as command_id,
+            rdt.tx_hash as executed_tx_hash,
+            rdt.block_number as executed_block_number,
+            rdt.custodian_group_uid as executed_address,
+            rdt.created_at as executed_created_at
+        `).Where("ccwtk.destination_chain = ?", config.Env.BITCOIN_CHAIN_ID).
+		Joins("LEFT JOIN redeem_txes rdt ON ccwtk.custodian_group_uid = rdt.custodian_group_uid AND rdt.session_sequence = rdt.session_sequence")
 
 	return AggregateCrossChainTxs(ctx, query, size, offset)
 }
