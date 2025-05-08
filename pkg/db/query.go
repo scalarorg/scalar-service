@@ -8,7 +8,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func BuildTokenSentsBaseQuery(db *gorm.DB, where func(db *gorm.DB)) *gorm.DB {
+func BuildTokenSentsBaseQuery(db *gorm.DB, extendWhereClause func(db *gorm.DB)) *gorm.DB {
 	query := db.Table("token_sents ts").
 		Select(`
             ts.*,
@@ -18,12 +18,13 @@ func BuildTokenSentsBaseQuery(db *gorm.DB, where func(db *gorm.DB)) *gorm.DB {
             ce.address as executed_address,
             ce.created_at as executed_created_at
         `)
-	where(query)
-	return query.Joins("LEFT JOIN token_sent_approveds tsa ON ts.event_id = tsa.event_id").
-		Joins("LEFT JOIN command_executeds ce ON tsa.command_id = ce.command_id")
+	extendWhereClause(query)
+	// return query.Joins("LEFT JOIN token_sent_approveds tsa ON ts.event_id = tsa.event_id").
+	// 	Joins("LEFT JOIN command_executeds ce ON tsa.command_id = ce.command_id")
+	return query.Joins("LEFT JOIN command_executeds ce ON ts.tx_hash = ce.command_id")
 }
 
-func BuildContractCallWithTokenBaseQuery(db *gorm.DB, where func(db *gorm.DB)) *gorm.DB {
+func BuildContractCallWithTokenBaseQuery(db *gorm.DB, extendWhereClause func(db *gorm.DB)) *gorm.DB {
 	query := db.Table("contract_call_with_tokens ccwtk").
 		Select(`
             ccwtk.*,
@@ -33,9 +34,10 @@ func BuildContractCallWithTokenBaseQuery(db *gorm.DB, where func(db *gorm.DB)) *
             ce.address as executed_address,
             ce.created_at as executed_created_at
         `)
-	where(query)
-	return query.Joins("LEFT JOIN contract_call_approved_with_mints ccawm ON ccwtk.event_id = ccawm.event_id").
-		Joins("LEFT JOIN command_executeds ce ON ccawm.command_id = ce.command_id")
+	extendWhereClause(query)
+	// return query.Joins("LEFT JOIN contract_call_approved_with_mints ccawm ON ccwtk.event_id = ccawm.event_id").
+	// 	Joins("LEFT JOIN command_executeds ce ON ccawm.command_id = ce.command_id")
+	return query.Joins("LEFT JOIN command_executeds ce ON ccwtk.tx_hash = ce.command_id")
 }
 
 func AggregateCrossChainTxs(ctx context.Context, query *gorm.DB, size, offset int) ([]BaseCrossChainTxResult, int, error) {
