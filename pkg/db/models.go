@@ -88,7 +88,8 @@ type BaseCrossChainTxResult struct {
 	ExecutedBlockNumber uint64 `gorm:"column:executed_block_number"`
 	ExecutedAddress     string `gorm:"column:executed_address"`
 
-	CreatedAt                time.Time `gorm:"column:created_at"`
+	//CreatedAt                time.Time `gorm:"column:created_at"`
+	CreatedAt                time.Time `gorm:"column:source_created_at"`
 	ExecutedCommandCreatedAt time.Time `gorm:"column:executed_created_at"`
 }
 
