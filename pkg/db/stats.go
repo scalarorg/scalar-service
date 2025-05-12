@@ -11,22 +11,84 @@ type Stats struct {
 	Count      uint64    `json:"count"`
 }
 
-func GetCommandStats(ctx context.Context, timeBucket string) ([]Stats, error) {
-	interval := getTimeBucketInterval(timeBucket)
+// mergeSortedEntries merges two sorted slices of Entry
+func mergeSortedStats(a, b []Stats) []Stats {
+	var result []Stats
+	i, j := 0, 0
 
-	var stats []Stats
-	err := DB.Relayer.Table("commands").
-		Select("time_bucket(? :: interval, created_at) as bucket_time, COUNT(*) as count", interval).
-		Group("bucket_time").
-		Order("bucket_time ASC").
-		Find(&stats).Error
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch command stats: %w", err)
+	for i < len(a) && j < len(b) {
+		if a[i].BucketTime.Equal(b[j].BucketTime) {
+			result = append(result, Stats{
+				BucketTime: a[i].BucketTime,
+				Count:      a[i].Count + b[j].Count,
+			})
+			i++
+			j++
+		} else if a[i].BucketTime.Before(b[j].BucketTime) {
+			result = append(result, a[i])
+			i++
+		} else {
+			result = append(result, b[j])
+			j++
+		}
 	}
 
-	return stats, nil
+	// Append any remaining entries
+	for ; i < len(a); i++ {
+		result = append(result, a[i])
+	}
+	for ; j < len(b); j++ {
+		result = append(result, b[j])
+	}
+
+	return result
 }
+
+func GetCommandStats(ctx context.Context, timeBucket string) ([]Stats, error) {
+	if !validateTimeBucketInterval(timeBucket) {
+		return nil, fmt.Errorf("invalid bucket name")
+	}
+	var tokenStats []Stats
+	err := DB.Relayer.Table("token_sents").
+		Select("date_trunc(?, to_timestamp(block_time)) as bucket_time, COUNT(*) as count", timeBucket).
+		Group("bucket_time").
+		Order("bucket_time ASC").
+		Find(&tokenStats).Error
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch token_sents stats: %w", err)
+	}
+	var ccwtStats []Stats
+	err = DB.Relayer.Table("contract_call_with_tokens ccwt left join block_headers bh on ccwt.source_chain = bh.chain and ccwt.block_number = bh.block_number").
+		Select("date_trunc(?, to_timestamp(bh.block_time)) as bucket_time, COUNT(*) as count", timeBucket).
+		Group("bucket_time").
+		Order("bucket_time ASC").
+		Find(&ccwtStats).Error
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch token_sents stats: %w", err)
+	}
+	//Merge two list
+	allStats := mergeSortedStats(tokenStats, ccwtStats)
+	return allStats, nil
+}
+
+// func GetCommandStatsWithTimeScale(ctx context.Context, timeBucket string) ([]Stats, error) {
+// 	interval := getTimeBucketInterval(timeBucket)
+
+// 	var stats []Stats
+// 	err := DB.Relayer.Table("commands").
+// 		Select("time_bucket(? :: interval, created_at) as bucket_time, COUNT(*) as count", interval).
+// 		Group("bucket_time").
+// 		Order("bucket_time ASC").
+// 		Find(&stats).Error
+
+// 	if err != nil {
+// 		return nil, fmt.Errorf("failed to fetch command stats: %w", err)
+// 	}
+
+// 	return stats, nil
+// }
 
 type TokenSentStats struct {
 	BucketTime  time.Time `json:"bucket_time" gorm:"column:bucket_time"`
@@ -36,26 +98,39 @@ type TokenSentStats struct {
 }
 
 func GetTokenStats(timeBucket string) ([]TokenSentStats, error) {
-	interval := getTimeBucketInterval(timeBucket)
+	//interval := getTimeBucketInterval(timeBucket)
+	if !validateTimeBucketInterval(timeBucket) {
+		return nil, fmt.Errorf("invalid bucket name")
+	}
 	var stats []TokenSentStats
-
-	err := DB.Relayer.Raw(`
+	// timeScaleRawQuery := `
+	// 	SELECT
+	// 		time_bucket(? :: interval, ts.created_at) as bucket_time,
+	// 		COUNT(DISTINCT ts.source_address) as active_users,
+	// 		COUNT(DISTINCT CASE WHEN ts.created_at = first_seen.first_time THEN ts.source_address ELSE NULL END) as new_users,
+	// 		SUM(ts.amount) as total_amount
+	// 	FROM token_sents ts
+	// 	JOIN (
+	// 		SELECT
+	// 			source_address,
+	// 			MIN(created_at) as first_time
+	// 		FROM token_sents
+	// 		GROUP BY source_address
+	// 	) as first_seen ON ts.source_address = first_seen.source_address
+	// 	GROUP BY bucket_time
+	// 	ORDER BY bucket_time ASC
+	// `
+	rawQuery := `
 		SELECT 
-			time_bucket(? :: interval, ts.created_at) as bucket_time,
+			date_trunc(?, to_timestamp(ts.block_time)) as bucket_time,
 			COUNT(DISTINCT ts.source_address) as active_users,
-			COUNT(DISTINCT CASE WHEN ts.created_at = first_seen.first_time THEN ts.source_address ELSE NULL END) as new_users,
+			COUNT(DISTINCT ts.source_address) as new_users,
 			SUM(ts.amount) as total_amount
 		FROM token_sents ts
-		JOIN (
-			SELECT 
-				source_address, 
-				MIN(created_at) as first_time
-			FROM token_sents
-			GROUP BY source_address
-		) as first_seen ON ts.source_address = first_seen.source_address
 		GROUP BY bucket_time
 		ORDER BY bucket_time ASC 
-	`, interval).Scan(&stats).Error
+	`
+	err := DB.Relayer.Raw(rawQuery, timeBucket).Scan(&stats).Error
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch token stats: %w", err)

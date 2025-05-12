@@ -25,3 +25,22 @@ func getTimeBucketInterval(bucket string) string {
 		return "1 day" // default interval
 	}
 }
+
+func validateTimeBucketInterval(bucket string) bool {
+	if bucket == "microseconds" ||
+		bucket == "milliseconds" ||
+		bucket == "second" ||
+		bucket == "minute" ||
+		bucket == "hour" ||
+		bucket == "day" ||
+		bucket == "week" ||
+		bucket == "month" ||
+		bucket == "quarter" ||
+		bucket == "year" ||
+		bucket == "decade" ||
+		bucket == "century" ||
+		bucket == "millennium" {
+		return true
+	}
+	return false
+}
