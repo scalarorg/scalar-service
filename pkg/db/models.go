@@ -48,6 +48,7 @@ type BaseDocument struct {
 	ChainName   string `json:"chain_name"`
 	TxHash      string `json:"tx_hash"`
 	BlockHeight uint64 `json:"block_height"`
+	BlockTime   uint64 `json:"block_time"`
 	Status      string `json:"status"`
 
 	Value           string          `json:"value"`
@@ -71,6 +72,7 @@ type BaseCrossChainTxResult struct {
 	EventID              string `gorm:"column:event_id"`
 	TxHash               string `gorm:"column:tx_hash"`
 	BlockNumber          uint64 `gorm:"column:block_number"`
+	BlockTime            uint64 `gorm:"column:block_time"`
 	SourceChain          string `gorm:"column:source_chain"`
 	SourceAddress        string `gorm:"column:source_address"`
 	DestinationChain     string `gorm:"column:destination_chain"`
@@ -84,13 +86,12 @@ type BaseCrossChainTxResult struct {
 	CommandID string `gorm:"column:command_id"`
 
 	// CommandExecuted specific fields
-	ExecutedTxHash      string `gorm:"column:executed_tx_hash"`
-	ExecutedBlockNumber uint64 `gorm:"column:executed_block_number"`
-	ExecutedAddress     string `gorm:"column:executed_address"`
+	ExecutedTxHash      string    `gorm:"column:executed_tx_hash"`
+	ExecutedBlockNumber uint64    `gorm:"column:executed_block_number"`
+	ExecutedBlockTime   time.Time `gorm:"column:executed_block_time"`
+	ExecutedAddress     string    `gorm:"column:executed_address"`
 
-	//CreatedAt                time.Time `gorm:"column:created_at"`
-	CreatedAt                time.Time `gorm:"column:source_created_at"`
-	ExecutedCommandCreatedAt time.Time `gorm:"column:executed_created_at"`
+	CreatedAt time.Time `gorm:"column:created_at"`
 }
 
 var _ (ExpectedCrossChainDocument) = (*BaseCrossChainTxResult)(nil)
@@ -141,6 +142,7 @@ func (b *BaseCrossChainTxResult) GetSource() *SourceDocument {
 				IsNative: false,
 			},
 			BlockHeight: b.BlockNumber,
+			BlockTime:   b.BlockTime,
 			// TODO: refactor time mechanism
 			CreatedAt: uint64(b.CreatedAt.Unix()),
 		},
@@ -182,8 +184,7 @@ func (b *BaseCrossChainTxResult) GetDestination() *DestinationDocument {
 				IsNative: false,
 			},
 			BlockHeight: b.ExecutedBlockNumber,
-			// TODO: refactor time mechanism
-			CreatedAt: uint64(b.ExecutedCommandCreatedAt.Unix()),
+			BlockTime:   uint64(b.ExecutedBlockTime.Unix()),
 		},
 		Receiver: b.DestinationAddress,
 	}

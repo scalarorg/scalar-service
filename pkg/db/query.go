@@ -16,14 +16,12 @@ func BuildTokenSentsBaseQuery(db *gorm.DB, extendWhereClause func(db *gorm.DB)) 
             ce.tx_hash as executed_tx_hash,
             ce.block_number as executed_block_number,
             ce.address as executed_address,
-			to_timestamp(sbh.block_time) as source_created_at,
-            to_timestamp(dbh.block_time) as executed_created_at
+            to_timestamp(dbh.block_time) as executed_block_time
         `)
 	extendWhereClause(query)
 	// return query.Joins("LEFT JOIN token_sent_approveds tsa ON ts.event_id = tsa.event_id").
 	// 	Joins("LEFT JOIN command_executeds ce ON tsa.command_id = ce.command_id")
 	return query.Joins("LEFT JOIN command_executeds ce ON ts.tx_hash = ce.command_id").
-		Joins("LEFT JOIN block_headers sbh ON ts.source_chain = sbh.chain AND ts.block_number = sbh.block_number").
 		Joins("LEFT JOIN block_headers dbh ON ce.source_chain = dbh.chain AND ce.block_number = dbh.block_number")
 }
 
@@ -60,7 +58,7 @@ func AggregateCrossChainTxs(ctx context.Context, query *gorm.DB, size, offset in
 	}
 
 	err := query.
-		Order("created_at DESC").
+		Order("block_time DESC").
 		Offset(offset).
 		Limit(size).
 		Find(&results).Error
