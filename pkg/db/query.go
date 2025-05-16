@@ -92,7 +92,7 @@ func GetTransferTx(ctx context.Context, txHash string) (*BaseCrossChainTxResult,
 
 func ListBridgeTxs(ctx context.Context, size, offset int) ([]BaseCrossChainTxResult, int, error) {
 	query := BuildTokenSentsBaseQuery(DB.Relayer, func(db *gorm.DB) {
-		db.Where("ts.source_chain = ?", config.Env.BITCOIN_CHAIN_ID)
+		db.Where("ts.source_chain = ? and ts.deleted_at is null", config.Env.BITCOIN_CHAIN_ID)
 	})
 
 	return AggregateCrossChainTxs(ctx, query, size, offset)
