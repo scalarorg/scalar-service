@@ -141,11 +141,11 @@ func GetTokenStats(timeBucket string) ([]TokenSentStats, error) {
 func GetTotalTxs() (int64, error) {
 	var totalTxs int64
 	query := `
-		SELECT
+		SELECT 
 			COUNT(*) as total_txs
-		FROM event_token_sents
+		FROM token_sents
 	`
-	err := DB.Indexer.Raw(query).Scan(&totalTxs).Error
+	err := DB.Relayer.Raw(query).Scan(&totalTxs).Error
 	if err != nil {
 		return 0, fmt.Errorf("failed to fetch total txs: %w", err)
 	}
@@ -156,11 +156,11 @@ func GetTotalBridgedVolumes(chain string) (int64, error) {
 	var totalVolumes int64
 	query := `
 		SELECT
-			SUM(asset_amount) as total_volumes
-		FROM event_token_sents
-		WHERE chain = ?
+			SUM(amount) as total_volumes
+		FROM token_sents
+		WHERE source_chain = ?
 	`
-	err := DB.Indexer.Raw(query, chain).Scan(&totalVolumes).Error
+	err := DB.Relayer.Raw(query, chain).Scan(&totalVolumes).Error
 	if err != nil {
 		return 0, fmt.Errorf("failed to fetch total volumes: %w", err)
 	}
@@ -171,10 +171,10 @@ func GetTotalUsers() (int64, error) {
 	var totalUsers int64
 	query := `
 		SELECT
-			COUNT(DISTINCT sender) as total_users
-		FROM event_token_sents
+			COUNT(DISTINCT source_address) as total_users
+		FROM token_sents
 	`
-	err := DB.Indexer.Raw(query).Scan(&totalUsers).Error
+	err := DB.Relayer.Raw(query).Scan(&totalUsers).Error
 	if err != nil {
 		return 0, fmt.Errorf("failed to fetch total users: %w", err)
 	}

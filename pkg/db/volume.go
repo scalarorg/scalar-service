@@ -14,9 +14,9 @@ func GetTopTransferUsers(limit int) ([]types.AddressAmount, error) {
 			source_address as address,
 			SUM(amount) as amount
 		FROM token_sents
-		GROUP BY address
-		ORDER BY amount DESC
 		WHERE source_chain LIKE 'evm|%'
+		GROUP BY address
+		ORDER BY amount DESC		
 		LIMIT ?
 	`
 	err := DB.Relayer.Raw(query, limit).Scan(&stats).Error
@@ -34,7 +34,7 @@ func GetTopBridgeUsers(sourceChain string, limit int) ([]*types.AddressAmount, e
 			source_address as address,
 			SUM(amount) as amount
 		FROM token_sents
-		WHERE source_chain LIKE 'bitcoin|%'
+		WHERE source_chain = ?
 		GROUP BY address
 		ORDER BY amount DESC
 		LIMIT ?
