@@ -120,13 +120,21 @@ func GetTokenStats(timeBucket string) ([]TokenSentStats, error) {
 	// 	GROUP BY bucket_time
 	// 	ORDER BY bucket_time ASC
 	// `
+
 	rawQuery := `
 		SELECT 
 			date_trunc(?, to_timestamp(ts.block_time)) as bucket_time,
 			COUNT(DISTINCT ts.source_address) as active_users,
-			COUNT(DISTINCT ts.source_address) as new_users,
+			COUNT(DISTINCT CASE WHEN ts.block_time = first_seen.first_time THEN ts.source_address ELSE NULL END) as new_users,
 			SUM(ts.amount) as total_amount
 		FROM token_sents ts
+		JOIN (
+			SELECT
+				source_address,
+				min(block_time) as first_time
+			FROM token_sents
+			GROUP BY source_address
+		) as first_seen ON ts.source_address = first_seen.source_address
 		GROUP BY bucket_time
 		ORDER BY bucket_time ASC 
 	`
