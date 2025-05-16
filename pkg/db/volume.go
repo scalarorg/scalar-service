@@ -11,14 +11,15 @@ func GetTopTransferUsers(limit int) ([]types.AddressAmount, error) {
 	var stats []types.AddressAmount
 	query := `
 		SELECT 
-			sender as address,
-			SUM(asset_amount) as amount
-		FROM event_token_sents
+			source_address as address,
+			SUM(amount) as amount
+		FROM token_sents
 		GROUP BY address
 		ORDER BY amount DESC
+		WHERE source_chain LIKE 'evm|%'
 		LIMIT ?
 	`
-	err := DB.Indexer.Raw(query, limit).Scan(&stats).Error
+	err := DB.Relayer.Raw(query, limit).Scan(&stats).Error
 	log.Info().Msgf("top transfer users: %v", stats)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch top transfer users: %w", err)
@@ -30,15 +31,15 @@ func GetTopBridgeUsers(sourceChain string, limit int) ([]*types.AddressAmount, e
 	var stats []*types.AddressAmount
 	query := `
 		SELECT 
-			sender as address,
-			SUM(asset_amount) as amount
-		FROM event_token_sents
-		WHERE chain = ?
+			source_address as address,
+			SUM(amount) as amount
+		FROM token_sents
+		WHERE source_chain LIKE 'bitcoin|%'
 		GROUP BY address
 		ORDER BY amount DESC
 		LIMIT ?
 	`
-	err := DB.Indexer.Raw(query, sourceChain, limit).Scan(&stats).Error
+	err := DB.Relayer.Raw(query, sourceChain, limit).Scan(&stats).Error
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch top transfer users: %w", err)
 	}
@@ -49,14 +50,14 @@ func StatVolumeBySourceChain(limit int) ([]*types.ChainAmount, error) {
 	var stats []*types.ChainAmount
 	query := `
 		SELECT 
-			chain,
-			SUM(asset_amount) as amount
-		FROM event_token_sents
+			source_chain as chain,
+			SUM(amount) as amount
+		FROM token_sents
 		GROUP BY chain
 		ORDER BY amount DESC
 		LIMIT ?
 	`
-	err := DB.Indexer.Raw(query, limit).Scan(&stats).Error
+	err := DB.Relayer.Raw(query, limit).Scan(&stats).Error
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch top transfer users: %w", err)
 	}
@@ -68,13 +69,13 @@ func StatVolumeByDestinationChain(limit int) ([]*types.ChainAmount, error) {
 	query := `
 		SELECT 
 			destination_chain as chain,
-			SUM(asset_amount) as amount
-		FROM event_token_sents
+			SUM(amount) as amount
+		FROM token_sents
 		GROUP BY destination_chain
 		ORDER BY amount DESC
 		LIMIT ?
 	`
-	err := DB.Indexer.Raw(query, limit).Scan(&stats).Error
+	err := DB.Relayer.Raw(query, limit).Scan(&stats).Error
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch top transfer users: %w", err)
 	}
@@ -85,15 +86,15 @@ func StatVolumeByPath(limit int) ([]*types.PathAmount, error) {
 	var stats []*types.PathAmount
 	query := `
 		SELECT 
-			chain as source_chain,
+			source_chain,
 			destination_chain,
-			SUM(asset_amount) as amount
-		FROM event_token_sents
+			SUM(amount) as amount
+		FROM token_sents
 		GROUP BY source_chain, destination_chain
 		ORDER BY amount DESC
 		LIMIT ?
 	`
-	err := DB.Indexer.Raw(query, limit).Scan(&stats).Error
+	err := DB.Relayer.Raw(query, limit).Scan(&stats).Error
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch top transfer users: %w", err)
 	}
