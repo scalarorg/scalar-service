@@ -92,7 +92,7 @@ func GetTransferTx(ctx context.Context, txHash string) (*BaseCrossChainTxResult,
 
 func ListBridgeTxs(ctx context.Context, size, offset int) ([]BaseCrossChainTxResult, int, error) {
 	query := BuildTokenSentsBaseQuery(DB.Relayer, func(db *gorm.DB) {
-		db.Where("ts.source_chain = ? and ts.deleted_at is null", config.Env.BITCOIN_CHAIN_ID)
+		db.Where("ts.source_chain = ?", config.Env.BITCOIN_CHAIN_ID)
 	})
 
 	return AggregateCrossChainTxs(ctx, query, size, offset)
@@ -113,18 +113,18 @@ func GetBridgeTx(ctx context.Context, txHash string) (*BaseCrossChainTxResult, e
 }
 
 func ListRedeemTxs(ctx context.Context, size, offset int) ([]BaseCrossChainTxResult, int, error) {
-	query := DB.Relayer.Table("contract_call_with_tokens ccwtk").
+	query := DB.Relayer.Table("evm_redeem_txes ert").
 		Select(`
-            ccwtk.*,
-            ccwtk.tx_hash as command_id,
-            rdt.tx_hash as executed_tx_hash,
-            rdt.block_number as executed_block_number,
-            rdt.custodian_group_uid as executed_address,
+            ert.*,
+            brt.tx_hash as command_id,
+            brt.tx_hash as executed_tx_hash,
+            brt.block_number as executed_block_number,
+            brt.custodian_group_uid as executed_address,
 			to_timestamp(sbh.block_time) as source_created_at,
-            to_timestamp(rdt.block_time) as executed_created_at
-        `).Where("ccwtk.destination_chain = ?", config.Env.BITCOIN_CHAIN_ID).
-		Joins("LEFT JOIN redeem_txes rdt ON ccwtk.custodian_group_uid = rdt.custodian_group_uid AND rdt.session_sequence = rdt.session_sequence").
-		Joins("LEFT JOIN block_headers sbh ON ccwtk.source_chain = sbh.chain AND ccwtk.block_number = sbh.block_number")
+            to_timestamp(brt.block_time) as executed_created_at
+        `).Where("ert.destination_chain = ?", config.Env.BITCOIN_CHAIN_ID).
+		Joins("LEFT JOIN btc_redeem_txes brt ON ert.custodian_group_uid = brt.custodian_group_uid AND ert.session_sequence = brt.session_sequence").
+		Joins("LEFT JOIN block_headers sbh ON brt.chain = sbh.chain AND brt.block_number = sbh.block_number")
 
 	return AggregateCrossChainTxs(ctx, query, size, offset)
 }
