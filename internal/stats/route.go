@@ -17,5 +17,9 @@ func Route(g *echo.Group, path string) {
 	transaction.GET("/topSourceChains", handlers.GetTopSourceChainsByTx)
 	transaction.GET("/topDestinationChains", handlers.GetTopDestinationChainsByTx)
 	transaction.GET("/topPaths", handlers.GetTopPathsByTx)
-	x.GET("", handlers.Get)
+
+	x.GET("/txs", handlers.GetTxsStatsHandler)
+	x.GET("/volumes", handlers.GetVolumesStatsHandler)
+	x.GET("/active-users", handlers.GetActiveUsersStatsHandler)
+	x.GET("/new-users", handlers.GetNewUsersStatsHandler)
 }

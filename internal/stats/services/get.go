@@ -87,6 +87,7 @@ func GetStats(ctx context.Context, opts *StatsOpts) (*StatsResponse, error) {
 	response = GetTransactionStats(ctx, opts, response)
 	return response, nil
 }
+
 func GetOverallStats(ctx context.Context, opts *StatsOpts, response *StatsResponse) *StatsResponse {
 	totalTxs, err := db.GetTotalTxs()
 	if err != nil {
@@ -144,4 +145,64 @@ func GetTransactionStats(ctx context.Context, opts *StatsOpts, response *StatsRe
 		log.Error().Err(err).Msg("failed to get top paths by tx")
 	}
 	return response
+}
+
+func GetTxsStats(ctx context.Context, opts *StatsOpts) ([]*StatsPayload, error) {
+	cmds, err := db.GetCommandStats(ctx, opts.TimeBucket)
+	if err != nil {
+		return nil, err
+	}
+	txs := make([]*StatsPayload, 0)
+	for _, cmd := range cmds {
+		txs = append(txs, &StatsPayload{
+			Value: cmd.Count,
+			Time:  cmd.BucketTime.Unix(),
+		})
+	}
+	return txs, nil
+}
+
+func GetVolumesStats(ctx context.Context, opts *StatsOpts) ([]*StatsPayload, error) {
+	tokenSentSats, err := db.GetTokenStats(opts.TimeBucket)
+	if err != nil {
+		return nil, err
+	}
+	volumes := make([]*StatsPayload, 0)
+	for _, token := range tokenSentSats {
+		volumes = append(volumes, &StatsPayload{
+			Value: token.TotalAmount,
+			Time:  token.BucketTime.Unix(),
+		})
+	}
+	return volumes, nil
+}
+
+func GetActiveUsersStats(ctx context.Context, opts *StatsOpts) ([]*StatsPayload, error) {
+	tokenSentSats, err := db.GetTokenStats(opts.TimeBucket)
+	if err != nil {
+		return nil, err
+	}
+	activeUsers := make([]*StatsPayload, 0)
+	for _, token := range tokenSentSats {
+		activeUsers = append(activeUsers, &StatsPayload{
+			Value: token.ActiveUsers,
+			Time:  token.BucketTime.Unix(),
+		})
+	}
+	return activeUsers, nil
+}
+
+func GetNewUsersStats(ctx context.Context, opts *StatsOpts) ([]*StatsPayload, error) {
+	tokenSentSats, err := db.GetTokenStats(opts.TimeBucket)
+	if err != nil {
+		return nil, err
+	}
+	newUsers := make([]*StatsPayload, 0)
+	for _, token := range tokenSentSats {
+		newUsers = append(newUsers, &StatsPayload{
+			Value: token.NewUsers,
+			Time:  token.BucketTime.Unix(),
+		})
+	}
+	return newUsers, nil
 }

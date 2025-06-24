@@ -67,11 +67,11 @@ func setupAddHandlerEvent(e *echo.Echo) {
 func setupMiddleware(e *echo.Echo) {
 	//log.Info().Any("CORS", config.Env.CORS_WHITE_LIST).Msg("setupMiddleware")
 	e.Use(middleware.Recover())
-	// e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
-	// 	AllowOrigins: []string{"*"},
-	// 	AllowMethods: []string{echo.GET, echo.HEAD, echo.PUT, echo.PATCH, echo.POST, echo.DELETE},
-	// 	AllowHeaders: []string{echo.HeaderOrigin, echo.HeaderContentType, echo.HeaderAccept, echo.HeaderAuthorization},
-	// }))
+	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
+		AllowOrigins: []string{"*"},
+		AllowMethods: []string{echo.GET, echo.HEAD, echo.PUT, echo.PATCH, echo.POST, echo.DELETE},
+		AllowHeaders: []string{echo.HeaderOrigin, echo.HeaderContentType, echo.HeaderAccept, echo.HeaderAuthorization},
+	}))
 	e.Use(openobserve.Middleware())
 	e.Use(utils.RequestLogMiddleware())
 }

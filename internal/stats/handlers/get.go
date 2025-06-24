@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"net/http"
+
 	"github.com/labstack/echo/v4"
 	"github.com/scalarorg/scalar-service/constants"
 	"github.com/scalarorg/scalar-service/internal/stats/services"
@@ -11,31 +13,107 @@ type User struct {
 	ID string `query:"id"`
 }
 
-func Get(c echo.Context) error {
-	ctx := c.Request().Context()
 
-	var params services.StatsOpts
-	err := utils.BindAndValidate(c, &params)
-	if err != nil {
+func GetTxsStatsHandler(c echo.Context) error {
+	var opts services.StatsOpts
+	if err := utils.BindAndValidate(c, &opts); err != nil {
 		return err
 	}
+
 	//Set default network to testnet4
-	switch params.Network {
+	switch opts.Network {
 	case "mainnet":
-		params.Network = "bitcoin|1"
+		opts.Network = "bitcoin|1"
 	case "testnet":
-		params.Network = constants.DefaultChain
-	default:
-		params.Network = constants.DefaultChain
+		opts.Network = constants.DefaultChain
 	}
+
 	//Set default limit to 10
-	if params.Limit == 0 {
-		params.Limit = 10
-	}
-	result, err := services.GetStats(ctx, &params)
+	if opts.Limit == 0 {
+		opts.Limit = 10
+	}	
+
+	txs, err := services.GetTxsStats(c.Request().Context(), &opts)
 	if err != nil {
 		return err
 	}
+	return c.JSON(http.StatusOK, txs)
+}
 
-	return c.JSON(200, result)
+func GetVolumesStatsHandler(c echo.Context) error {
+	var opts services.StatsOpts
+	if err := utils.BindAndValidate(c, &opts); err != nil {
+		return err
+	}
+
+	//Set default network to testnet4
+	switch opts.Network {
+	case "mainnet":
+		opts.Network = "bitcoin|1"
+	case "testnet":
+		opts.Network = constants.DefaultChain
+	}
+
+	//Set default limit to 10
+	if opts.Limit == 0 {
+		opts.Limit = 10
+	}
+
+	volumes, err := services.GetVolumesStats(c.Request().Context(), &opts)
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, volumes)
+}
+
+func GetActiveUsersStatsHandler(c echo.Context) error {
+	var opts services.StatsOpts
+	if err := utils.BindAndValidate(c, &opts); err != nil {
+		return err
+	}
+
+	//Set default network to testnet4
+	switch opts.Network {
+	case "mainnet":
+		opts.Network = "bitcoin|1"
+	case "testnet":
+		opts.Network = constants.DefaultChain
+	}
+	
+	//Set default limit to 10
+	if opts.Limit == 0 {
+		opts.Limit = 10
+	}
+
+	activeUsers, err := services.GetActiveUsersStats(c.Request().Context(), &opts)
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, activeUsers)
+}
+
+func GetNewUsersStatsHandler(c echo.Context) error {
+	var opts services.StatsOpts
+	if err := utils.BindAndValidate(c, &opts); err != nil {
+		return err
+	}
+
+	//Set default network to testnet4
+	switch opts.Network {
+	case "mainnet":
+		opts.Network = "bitcoin|1"
+	case "testnet":
+		opts.Network = constants.DefaultChain
+	}
+
+	//Set default limit to 10
+	if opts.Limit == 0 {
+		opts.Limit = 10
+	}
+
+	newUsers, err := services.GetNewUsersStats(c.Request().Context(), &opts)
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, newUsers)
 }
