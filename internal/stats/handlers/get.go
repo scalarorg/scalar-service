@@ -13,7 +13,6 @@ type User struct {
 	ID string `query:"id"`
 }
 
-
 func GetTxsStatsHandler(c echo.Context) error {
 	var opts services.StatsOpts
 	if err := utils.BindAndValidate(c, &opts); err != nil {
@@ -31,7 +30,7 @@ func GetTxsStatsHandler(c echo.Context) error {
 	//Set default limit to 10
 	if opts.Limit == 0 {
 		opts.Limit = 10
-	}	
+	}
 
 	txs, err := services.GetTxsStats(c.Request().Context(), &opts)
 	if err != nil {
@@ -79,7 +78,7 @@ func GetActiveUsersStatsHandler(c echo.Context) error {
 	case "testnet":
 		opts.Network = constants.DefaultChain
 	}
-	
+
 	//Set default limit to 10
 	if opts.Limit == 0 {
 		opts.Limit = 10
@@ -116,4 +115,26 @@ func GetNewUsersStatsHandler(c echo.Context) error {
 		return err
 	}
 	return c.JSON(http.StatusOK, newUsers)
+}
+
+func GetSummaryStatsHandler(c echo.Context) error {
+	var opts services.StatsOpts
+	if err := utils.BindAndValidate(c, &opts); err != nil {
+		return err
+	}
+
+	switch opts.Network {
+	case "mainnet":
+		opts.Network = "bitcoin|1"
+	case "testnet":
+		opts.Network = constants.DefaultChain
+	default:
+		opts.Network = constants.DefaultChain 
+	}
+
+	summary, err := services.GetSummaryStats(c.Request().Context(), &opts)
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, summary)
 }

@@ -105,6 +105,32 @@ func GetOverallStats(ctx context.Context, opts *StatsOpts, response *StatsRespon
 	return response
 }
 
+type SummaryStats struct {
+	TotalTxs     int64 `json:"total_txs"`
+	TotalVolumes int64 `json:"total_volumes"`
+	TotalUsers   int64 `json:"total_users"`
+}
+
+func GetSummaryStats(ctx context.Context, opts *StatsOpts) (*SummaryStats, error) {
+	totalTxs, err := db.GetTotalTxs()
+	if err != nil {
+		return nil, err
+	}
+	totalVolumes, err := db.GetTotalBridgedVolumes(opts.Network)
+	if err != nil {
+		return nil, err
+	}
+	totalUsers, err := db.GetTotalUsers()
+	if err != nil {
+		return nil, err
+	}
+	return &SummaryStats{
+		TotalTxs:     totalTxs,
+		TotalVolumes: totalVolumes,
+		TotalUsers:   totalUsers,
+	}, nil
+}
+
 func GetVolumeStats(ctx context.Context, opts *StatsOpts, response *StatsResponse) *StatsResponse {
 	var err error
 	response.TopUsers, err = db.GetTopTransferUsers(opts.Limit)
