@@ -22,8 +22,9 @@ type ServerEnv struct {
 	IsDev     bool
 	IsTest    bool
 
-	RELAYER_DB_URI string `validate:"uri"`
-	INDEXER_DB_URI string `validate:"uri"`
+	FAUCET_PRIVATE_KEY string
+	RELAYER_DB_URI     string `validate:"uri"`
+	INDEXER_DB_URI     string `validate:"uri"`
 
 	OPENOBSERVE_ENDPOINT   string `validate:"url"`
 	OPENOBSERVE_CREDENTIAL string `validate:"min=1"`

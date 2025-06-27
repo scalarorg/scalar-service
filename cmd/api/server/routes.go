@@ -2,6 +2,7 @@ package server
 
 import (
 	"github.com/labstack/echo/v4"
+	"github.com/scalarorg/scalar-service/internal/faucet"
 	"github.com/scalarorg/scalar-service/internal/health"
 	"github.com/scalarorg/scalar-service/internal/stats"
 	"github.com/scalarorg/scalar-service/internal/x"
@@ -12,4 +13,5 @@ func setupRoute(e *echo.Echo) {
 	health.Route(e, "/health")
 	x.Route(api, "/x")
 	stats.Route(api, "/stats")
+	faucet.Route(api, "/faucet")
 }
