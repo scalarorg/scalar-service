@@ -97,6 +97,37 @@ type TokenSentStats struct {
 	NewUsers    uint64    `json:"new_users" gorm:"column:new_users"`
 }
 
+func GetVolumeByTimeBucket(timeBucket string) ([]TokenSentStats, error) {
+	rawQuery := `
+	SELECT 
+		date_trunc(?, to_timestamp(vt.timestamp)) as bucket_time,
+		sum(amount) as total_amount
+		FROM vault_transactions vt
+		GROUP BY bucket_time
+		order by bucket_time asc`
+	var stats []TokenSentStats
+	err := DB.Indexer.Raw(rawQuery, timeBucket).Scan(&stats).Error
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch token stats: %w", err)
+	}
+	return stats, nil
+}
+
+func GetActiveUsersByTimeBucket(timeBucket string) ([]TokenSentStats, error) {
+	rawQuery := `
+	SELECT 
+		date_trunc(?, to_timestamp(vt.timestamp)) as bucket_time,
+		count(distinct staker_script_pubkey) as active_users
+		FROM vault_transactions vt
+		GROUP BY bucket_time
+		order by bucket_time asc`
+	var stats []TokenSentStats
+	err := DB.Indexer.Raw(rawQuery, timeBucket).Scan(&stats).Error
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch token stats: %w", err)
+	}
+	return stats, nil
+}
 func GetTokenStats(timeBucket string) ([]TokenSentStats, error) {
 	//interval := getTimeBucketInterval(timeBucket)
 	if !validateTimeBucketInterval(timeBucket) {
@@ -148,27 +179,39 @@ func GetTokenStats(timeBucket string) ([]TokenSentStats, error) {
 
 func GetTotalTxs() (int64, error) {
 	var totalTxs int64
+	// query := `
+	// 	SELECT
+	// 		COUNT(*) as total_txs
+	// 	FROM token_sents
+	// `
+	// err := DB.Relayer.Raw(query).Scan(&totalTxs).Error
 	query := `
 		SELECT 
 			COUNT(*) as total_txs
-		FROM token_sents
+		FROM vault_transactions
 	`
-	err := DB.Relayer.Raw(query).Scan(&totalTxs).Error
+	err := DB.Indexer.Raw(query).Scan(&totalTxs).Error
 	if err != nil {
 		return 0, fmt.Errorf("failed to fetch total txs: %w", err)
 	}
 	return totalTxs, nil
 }
-
 func GetTotalBridgedVolumes(chain string) (int64, error) {
 	var totalVolumes int64
+	// query := `
+	// 	SELECT
+	// 		SUM(amount) as total_volumes
+	// 	FROM token_sents
+	// 	WHERE source_chain = ?
+	// `
+	// err := DB.Relayer.Raw(query, chain).Scan(&totalVolumes).Error
 	query := `
 		SELECT
 			SUM(amount) as total_volumes
-		FROM token_sents
-		WHERE source_chain = ?
+		FROM vault_transactions
+		WHERE chain = ?
 	`
-	err := DB.Relayer.Raw(query, chain).Scan(&totalVolumes).Error
+	err := DB.Indexer.Raw(query, chain).Scan(&totalVolumes).Error
 	if err != nil {
 		return 0, fmt.Errorf("failed to fetch total volumes: %w", err)
 	}
@@ -177,12 +220,18 @@ func GetTotalBridgedVolumes(chain string) (int64, error) {
 
 func GetTotalUsers() (int64, error) {
 	var totalUsers int64
+	// query := `
+	// 	SELECT
+	// 		COUNT(DISTINCT source_address) as total_users
+	// 	FROM token_sents
+	// `
+	// err := DB.Relayer.Raw(query).Scan(&totalUsers).Error
 	query := `
 		SELECT
-			COUNT(DISTINCT source_address) as total_users
-		FROM token_sents
+			COUNT(DISTINCT staker_script_pubkey) as total_users
+		FROM vault_transactions
 	`
-	err := DB.Relayer.Raw(query).Scan(&totalUsers).Error
+	err := DB.Indexer.Raw(query).Scan(&totalUsers).Error
 	if err != nil {
 		return 0, fmt.Errorf("failed to fetch total users: %w", err)
 	}

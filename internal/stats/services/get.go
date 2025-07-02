@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"sync"
 
 	"github.com/rs/zerolog/log"
 	"github.com/scalarorg/scalar-service/pkg/db"
@@ -112,23 +113,42 @@ type SummaryStats struct {
 }
 
 func GetSummaryStats(ctx context.Context, opts *StatsOpts) (*SummaryStats, error) {
-	totalTxs, err := db.GetTotalTxs()
-	if err != nil {
-		return nil, err
-	}
-	totalVolumes, err := db.GetTotalBridgedVolumes(opts.Network)
-	if err != nil {
-		return nil, err
-	}
-	totalUsers, err := db.GetTotalUsers()
-	if err != nil {
-		return nil, err
-	}
-	return &SummaryStats{
-		TotalTxs:     totalTxs,
-		TotalVolumes: totalVolumes,
-		TotalUsers:   totalUsers,
-	}, nil
+	wg := sync.WaitGroup{}
+	var summary SummaryStats
+	lock := sync.Mutex{}
+	wg.Add(3)
+	go func() {
+		defer wg.Done()
+		totalTxs, err := db.GetTotalTxs()
+		if err != nil {
+			log.Error().Err(err).Msg("failed to get total txs")
+		}
+		lock.Lock()
+		summary.TotalTxs = totalTxs
+		lock.Unlock()
+	}()
+	go func() {
+		defer wg.Done()
+		totalVolumes, err := db.GetTotalBridgedVolumes(opts.Network)
+		if err != nil {
+			log.Error().Err(err).Msg("failed to get total volumes")
+		}
+		lock.Lock()
+		summary.TotalVolumes = totalVolumes
+		lock.Unlock()
+	}()
+	go func() {
+		defer wg.Done()
+		totalUsers, err := db.GetTotalUsers()
+		if err != nil {
+			log.Error().Err(err).Msg("failed to get total users")
+		}
+		lock.Lock()
+		summary.TotalUsers = totalUsers
+		lock.Unlock()
+	}()
+	wg.Wait()
+	return &summary, nil
 }
 
 func GetVolumeStats(ctx context.Context, opts *StatsOpts, response *StatsResponse) *StatsResponse {
@@ -189,7 +209,8 @@ func GetTxsStats(ctx context.Context, opts *StatsOpts) ([]*StatsPayload, error) 
 }
 
 func GetVolumesStats(ctx context.Context, opts *StatsOpts) ([]*StatsPayload, error) {
-	tokenSentSats, err := db.GetTokenStats(opts.TimeBucket)
+	//tokenSentSats, err := db.GetTokenStats(opts.TimeBucket)
+	tokenSentSats, err := db.GetVolumeByTimeBucket(opts.TimeBucket)
 	if err != nil {
 		return nil, err
 	}
@@ -204,7 +225,8 @@ func GetVolumesStats(ctx context.Context, opts *StatsOpts) ([]*StatsPayload, err
 }
 
 func GetActiveUsersStats(ctx context.Context, opts *StatsOpts) ([]*StatsPayload, error) {
-	tokenSentSats, err := db.GetTokenStats(opts.TimeBucket)
+	//tokenSentSats, err := db.GetTokenStats(opts.TimeBucket)
+	tokenSentSats, err := db.GetActiveUsersByTimeBucket(opts.TimeBucket)
 	if err != nil {
 		return nil, err
 	}
