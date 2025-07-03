@@ -133,7 +133,7 @@ type TokenSentStats struct {
 	NewUsers    uint64    `json:"new_users" gorm:"column:new_users"`
 }
 
-func GetStatsByTimeBucket(timeBucket string) ([]TokenSentStats, error) {
+func GetStatsByTimeBucket(timeBucket string, limit int) ([]TokenSentStats, error) {
 	rawQuery := `
 	SELECT 
 		date_trunc(?, to_timestamp(vt.timestamp)) as bucket_time,
@@ -141,13 +141,17 @@ func GetStatsByTimeBucket(timeBucket string) ([]TokenSentStats, error) {
 		count(distinct staker_script_pubkey) as active_users
 		FROM vault_transactions vt
 		GROUP BY bucket_time
-		order by bucket_time asc`
+		order by bucket_time desc
+		limit ?`
 	var stats []TokenSentStats
 	err := DB.Indexer.Raw(rawQuery, timeBucket).Scan(&stats).Error
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch token stats: %w", err)
 	}
-	return stats, nil
+	sort.Slice(stats, func(i, j int) bool {
+		return stats[i].BucketTime.Before(stats[j].BucketTime)
+	})
+	return stats[len(stats)-limit:], nil
 }
 
 func GetVolumeByTimeBucket(timeBucket string, limit int) ([]TokenSentStats, error) {
@@ -157,24 +161,28 @@ func GetVolumeByTimeBucket(timeBucket string, limit int) ([]TokenSentStats, erro
 		sum(amount) as total_amount
 		FROM vault_transactions vt
 		GROUP BY bucket_time
-		order by bucket_time asc
+		order by bucket_time desc
 		limit ?`
 	var stats []TokenSentStats
 	err := DB.Indexer.Raw(rawQuery, timeBucket, limit).Scan(&stats).Error
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch token stats: %w", err)
 	}
+	sort.Slice(stats, func(i, j int) bool {
+		return stats[i].BucketTime.Before(stats[j].BucketTime)
+	})
 	return stats, nil
 }
 
-func GetActiveUsersByTimeBucket(timeBucket string) ([]TokenSentStats, error) {
+func GetActiveUsersByTimeBucket(timeBucket string, limit int) ([]TokenSentStats, error) {
 	rawQuery := `
 	SELECT 
 		date_trunc(?, to_timestamp(vt.timestamp)) as bucket_time,
 		count(distinct staker_script_pubkey) as active_users
 		FROM vault_transactions vt
 		GROUP BY bucket_time
-		order by bucket_time asc`
+		order by bucket_time desc
+		limit ?`
 	var stats []TokenSentStats
 	err := DB.Indexer.Raw(rawQuery, timeBucket).Scan(&stats).Error
 	if err != nil {
