@@ -184,10 +184,13 @@ func GetActiveUsersByTimeBucket(timeBucket string, limit int) ([]TokenSentStats,
 		order by bucket_time desc
 		limit ?`
 	var stats []TokenSentStats
-	err := DB.Indexer.Raw(rawQuery, timeBucket).Scan(&stats).Error
+	err := DB.Indexer.Raw(rawQuery, timeBucket, limit).Scan(&stats).Error
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch token stats: %w", err)
 	}
+	sort.Slice(stats, func(i, j int) bool {
+		return stats[i].BucketTime.Before(stats[j].BucketTime)
+	})
 	return stats, nil
 }
 func GetNewUsersByTimeBucket(timeBucket string, limit int) ([]TokenSentStats, error) {
