@@ -3,7 +3,11 @@ package db
 import (
 	"context"
 	"fmt"
+	"sort"
+	"sync"
 	"time"
+
+	"github.com/rs/zerolog/log"
 )
 
 type Stats struct {
@@ -12,65 +16,97 @@ type Stats struct {
 }
 
 // mergeSortedEntries merges two sorted slices of Entry
-func mergeSortedStats(a, b []Stats) []Stats {
-	var result []Stats
-	i, j := 0, 0
+// func mergeSortedStats(a, b []Stats) []Stats {
+// 	var result []Stats
+// 	i, j := 0, 0
 
-	for i < len(a) && j < len(b) {
-		if a[i].BucketTime.Equal(b[j].BucketTime) {
-			result = append(result, Stats{
-				BucketTime: a[i].BucketTime,
-				Count:      a[i].Count + b[j].Count,
-			})
-			i++
-			j++
-		} else if a[i].BucketTime.Before(b[j].BucketTime) {
-			result = append(result, a[i])
-			i++
-		} else {
-			result = append(result, b[j])
-			j++
-		}
-	}
+// 	for i < len(a) && j < len(b) {
+// 		if a[i].BucketTime.Equal(b[j].BucketTime) {
+// 			result = append(result, Stats{
+// 				BucketTime: a[i].BucketTime,
+// 				Count:      a[i].Count + b[j].Count,
+// 			})
+// 			i++
+// 			j++
+// 		} else if a[i].BucketTime.Before(b[j].BucketTime) {
+// 			result = append(result, a[i])
+// 			i++
+// 		} else {
+// 			result = append(result, b[j])
+// 			j++
+// 		}
+// 	}
 
-	// Append any remaining entries
-	for ; i < len(a); i++ {
-		result = append(result, a[i])
-	}
-	for ; j < len(b); j++ {
-		result = append(result, b[j])
-	}
+// 	// Append any remaining entries
+// 	for ; i < len(a); i++ {
+// 		result = append(result, a[i])
+// 	}
+// 	for ; j < len(b); j++ {
+// 		result = append(result, b[j])
+// 	}
 
-	return result
-}
+// 	return result
+// }
 
-func GetCommandStats(ctx context.Context, timeBucket string) ([]Stats, error) {
+// Count transactions by time
+// Count bridge transaction in vault_transactions for bitcoin tx
+// Count contract call with tokens for evm transaction
+func GetCommandStats(ctx context.Context, timeBucket string, limit int) ([]Stats, error) {
 	if !validateTimeBucketInterval(timeBucket) {
 		return nil, fmt.Errorf("invalid bucket name")
 	}
-	var tokenStats []Stats
-	err := DB.Relayer.Table("token_sents").
-		Select("date_trunc(?, to_timestamp(block_time)) as bucket_time, COUNT(*) as count", timeBucket).
-		Group("bucket_time").
-		Order("bucket_time ASC").
-		Find(&tokenStats).Error
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch token_sents stats: %w", err)
-	}
+	wg := sync.WaitGroup{}
+	wg.Add(2)
+	var vaultTxStats []Stats
+	go func() {
+		defer wg.Done()
+		query := `
+			SELECT 
+				date_trunc(?, to_timestamp(timestamp)) as bucket_time, COUNT(*) as count
+			FROM vault_transactions
+			GROUP BY bucket_time
+			ORDER BY bucket_time DESC
+			LIMIT ?
+		`
+		err := DB.Indexer.Raw(query, timeBucket, limit).Scan(&vaultTxStats).Error
+		if err != nil {
+			log.Error().Err(err).Msg("failed to fetch vault_transactions stats")
+		}
+	}()
 	var ccwtStats []Stats
-	err = DB.Relayer.Table("contract_call_with_tokens ccwt left join block_headers bh on ccwt.source_chain = bh.chain and ccwt.block_number = bh.block_number").
-		Select("date_trunc(?, to_timestamp(bh.block_time)) as bucket_time, COUNT(*) as count", timeBucket).
-		Group("bucket_time").
-		Order("bucket_time ASC").
-		Find(&ccwtStats).Error
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch token_sents stats: %w", err)
-	}
+	go func() {
+		defer wg.Done()
+		query := `
+			SELECT 
+				date_trunc(?, to_timestamp(bh.block_time)) as bucket_time, COUNT(*) as count
+			FROM contract_call_with_tokens ccwt 
+			LEFT JOIN block_headers bh ON ccwt.source_chain = bh.chain AND ccwt.block_number = bh.block_number
+			GROUP BY bucket_time
+			ORDER BY bucket_time DESC
+			LIMIT ?
+		`
+		err := DB.Indexer.Raw(query, timeBucket, limit).Scan(&ccwtStats).Error
+		if err != nil {
+			log.Error().Err(err).Msg("failed to fetch contract_call_with_tokens stats")
+		}
+	}()
+	wg.Wait()
 	//Merge two list
-	allStats := mergeSortedStats(tokenStats, ccwtStats)
-	return allStats, nil
+	sort.Slice(vaultTxStats, func(i, j int) bool {
+		return vaultTxStats[i].BucketTime.Before(vaultTxStats[j].BucketTime)
+	})
+	sort.Slice(ccwtStats, func(i, j int) bool {
+		return ccwtStats[i].BucketTime.Before(ccwtStats[j].BucketTime)
+	})
+	allStats := mergeSortedStats(vaultTxStats, ccwtStats, func(a, b Stats) int {
+		return a.BucketTime.Compare(b.BucketTime)
+	}, func(a, b Stats) Stats {
+		return Stats{
+			BucketTime: a.BucketTime,
+			Count:      a.Count + b.Count,
+		}
+	})
+	return allStats[len(allStats)-limit:], nil
 }
 
 // func GetCommandStatsWithTimeScale(ctx context.Context, timeBucket string) ([]Stats, error) {
@@ -97,16 +133,34 @@ type TokenSentStats struct {
 	NewUsers    uint64    `json:"new_users" gorm:"column:new_users"`
 }
 
-func GetVolumeByTimeBucket(timeBucket string) ([]TokenSentStats, error) {
+func GetStatsByTimeBucket(timeBucket string) ([]TokenSentStats, error) {
+	rawQuery := `
+	SELECT 
+		date_trunc(?, to_timestamp(vt.timestamp)) as bucket_time,
+		sum(amount) as total_amount,
+		count(distinct staker_script_pubkey) as active_users
+		FROM vault_transactions vt
+		GROUP BY bucket_time
+		order by bucket_time asc`
+	var stats []TokenSentStats
+	err := DB.Indexer.Raw(rawQuery, timeBucket).Scan(&stats).Error
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch token stats: %w", err)
+	}
+	return stats, nil
+}
+
+func GetVolumeByTimeBucket(timeBucket string, limit int) ([]TokenSentStats, error) {
 	rawQuery := `
 	SELECT 
 		date_trunc(?, to_timestamp(vt.timestamp)) as bucket_time,
 		sum(amount) as total_amount
 		FROM vault_transactions vt
 		GROUP BY bucket_time
-		order by bucket_time asc`
+		order by bucket_time asc
+		limit ?`
 	var stats []TokenSentStats
-	err := DB.Indexer.Raw(rawQuery, timeBucket).Scan(&stats).Error
+	err := DB.Indexer.Raw(rawQuery, timeBucket, limit).Scan(&stats).Error
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch token stats: %w", err)
 	}
@@ -126,6 +180,35 @@ func GetActiveUsersByTimeBucket(timeBucket string) ([]TokenSentStats, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch token stats: %w", err)
 	}
+	return stats, nil
+}
+func GetNewUsersByTimeBucket(timeBucket string, limit int) ([]TokenSentStats, error) {
+	if !validateTimeBucketInterval(timeBucket) {
+		return nil, fmt.Errorf("invalid bucket name")
+	}
+	var stats []TokenSentStats
+	rawQuery := `
+		select 
+			count(staker_script_pubkey) as new_users,
+			bucket_time
+		from (SELECT
+				distinct staker_script_pubkey,
+				min(date_trunc(?, to_timestamp(vt.timestamp))) as bucket_time
+			FROM vault_transactions vt
+			GROUP BY staker_script_pubkey 
+		) as first_seen
+		group by bucket_time
+		order by bucket_time desc
+		limit ?
+	`
+	err := DB.Indexer.Raw(rawQuery, timeBucket, limit).Scan(&stats).Error
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch token stats: %w", err)
+	}
+	sort.Slice(stats, func(i, j int) bool {
+		return stats[i].BucketTime.Before(stats[j].BucketTime)
+	})
 	return stats, nil
 }
 func GetTokenStats(timeBucket string) ([]TokenSentStats, error) {

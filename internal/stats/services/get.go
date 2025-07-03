@@ -11,6 +11,7 @@ import (
 
 type StatsOpts struct {
 	Limit      int    `query:"limit" validate:"omitempty,min=1,max=100"`
+	Size       int    `query:"size" validate:"omitempty,min=1,max=100"`
 	Network    string `query:"network" validate:"omitempty,oneof=mainnet testnet"`
 	TimeBucket string `query:"time_bucket" validate:"omitempty,oneof=hour day week month"`
 }
@@ -40,7 +41,7 @@ type StatsResponse struct {
 
 // Todo: Consider using graphql for seperate stat request
 func GetStats(ctx context.Context, opts *StatsOpts) (*StatsResponse, error) {
-	cmds, err := db.GetCommandStats(ctx, opts.TimeBucket)
+	cmds, err := db.GetCommandStats(ctx, opts.TimeBucket, opts.Limit)
 	if err != nil {
 		return nil, err
 	}
@@ -193,8 +194,8 @@ func GetTransactionStats(ctx context.Context, opts *StatsOpts, response *StatsRe
 	return response
 }
 
-func GetTxsStats(ctx context.Context, opts *StatsOpts) ([]*StatsPayload, error) {
-	cmds, err := db.GetCommandStats(ctx, opts.TimeBucket)
+func GetTxsChartData(ctx context.Context, opts *StatsOpts) ([]*StatsPayload, error) {
+	cmds, err := db.GetCommandStats(ctx, opts.TimeBucket, opts.Limit)
 	if err != nil {
 		return nil, err
 	}
@@ -208,9 +209,24 @@ func GetTxsStats(ctx context.Context, opts *StatsOpts) ([]*StatsPayload, error) 
 	return txs, nil
 }
 
+// func GetTxsStats(ctx context.Context, opts *StatsOpts) ([]*StatsPayload, error) {
+// 	cmds, err := db.GetCommandStats(ctx, opts.TimeBucket)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	txs := make([]*StatsPayload, 0)
+// 	for _, cmd := range cmds {
+// 		txs = append(txs, &StatsPayload{
+// 			Value: cmd.Count,
+// 			Time:  cmd.BucketTime.Unix(),
+// 		})
+// 	}
+// 	return txs, nil
+// }
+
 func GetVolumesStats(ctx context.Context, opts *StatsOpts) ([]*StatsPayload, error) {
 	//tokenSentSats, err := db.GetTokenStats(opts.TimeBucket)
-	tokenSentSats, err := db.GetVolumeByTimeBucket(opts.TimeBucket)
+	tokenSentSats, err := db.GetVolumeByTimeBucket(opts.TimeBucket, opts.Limit)
 	if err != nil {
 		return nil, err
 	}
@@ -241,7 +257,8 @@ func GetActiveUsersStats(ctx context.Context, opts *StatsOpts) ([]*StatsPayload,
 }
 
 func GetNewUsersStats(ctx context.Context, opts *StatsOpts) ([]*StatsPayload, error) {
-	tokenSentSats, err := db.GetTokenStats(opts.TimeBucket)
+	//tokenSentSats, err := db.GetTokenStats(opts.TimeBucket)
+	tokenSentSats, err := db.GetNewUsersByTimeBucket(opts.TimeBucket, opts.Limit)
 	if err != nil {
 		return nil, err
 	}

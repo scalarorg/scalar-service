@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/labstack/echo/v4"
 	"github.com/scalarorg/scalar-service/constants"
@@ -11,6 +12,33 @@ import (
 
 type User struct {
 	ID string `query:"id"`
+}
+
+func setDefaultOpts(opts *services.StatsOpts) {
+	if opts.Limit == 0 {
+		if opts.Size > 0 {
+			opts.Limit = opts.Size
+		} else {
+			opts.Limit = 10
+		}
+	}
+}
+
+func getLimit(c echo.Context) int {
+	limit := c.QueryParam("limit")
+	size := c.QueryParam("size")
+	if limit == "" {
+		if size == "" {
+			limit = constants.DefaultLimit
+		} else {
+			limit = size
+		}
+	}
+	limitInt, err := strconv.Atoi(limit)
+	if err != nil {
+		return 10
+	}
+	return limitInt
 }
 
 func GetTxsStatsHandler(c echo.Context) error {
@@ -28,11 +56,9 @@ func GetTxsStatsHandler(c echo.Context) error {
 	}
 
 	//Set default limit to 10
-	if opts.Limit == 0 {
-		opts.Limit = 10
-	}
+	setDefaultOpts(&opts)
 
-	txs, err := services.GetTxsStats(c.Request().Context(), &opts)
+	txs, err := services.GetTxsChartData(c.Request().Context(), &opts)
 	if err != nil {
 		return err
 	}
@@ -54,9 +80,7 @@ func GetVolumesStatsHandler(c echo.Context) error {
 	}
 
 	//Set default limit to 10
-	if opts.Limit == 0 {
-		opts.Limit = 10
-	}
+	setDefaultOpts(&opts)
 
 	volumes, err := services.GetVolumesStats(c.Request().Context(), &opts)
 	if err != nil {
@@ -80,9 +104,7 @@ func GetActiveUsersStatsHandler(c echo.Context) error {
 	}
 
 	//Set default limit to 10
-	if opts.Limit == 0 {
-		opts.Limit = 10
-	}
+	setDefaultOpts(&opts)
 
 	activeUsers, err := services.GetActiveUsersStats(c.Request().Context(), &opts)
 	if err != nil {
@@ -104,11 +126,8 @@ func GetNewUsersStatsHandler(c echo.Context) error {
 	case "testnet":
 		opts.Network = constants.DefaultChain
 	}
-
 	//Set default limit to 10
-	if opts.Limit == 0 {
-		opts.Limit = 10
-	}
+	setDefaultOpts(&opts)
 
 	newUsers, err := services.GetNewUsersStats(c.Request().Context(), &opts)
 	if err != nil {
@@ -129,7 +148,7 @@ func GetSummaryStatsHandler(c echo.Context) error {
 	case "testnet":
 		opts.Network = constants.DefaultChain
 	default:
-		opts.Network = constants.DefaultChain 
+		opts.Network = constants.DefaultChain
 	}
 
 	summary, err := services.GetSummaryStats(c.Request().Context(), &opts)
