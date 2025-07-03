@@ -1,8 +1,6 @@
 package handlers
 
 import (
-	"strconv"
-
 	"github.com/labstack/echo/v4"
 	"github.com/scalarorg/scalar-service/constants"
 	"github.com/scalarorg/scalar-service/internal/stats/services"
@@ -18,15 +16,7 @@ func GetTopUsersByVolume(c echo.Context) error {
 		return err
 	}
 
-	limit := c.QueryParam("limit")
-	if limit == "" {
-		limit = "10"
-	}
-
-	limitInt, err := strconv.Atoi(limit)
-	if err != nil {
-		return err
-	}
+	limitInt := getLimit(c)
 
 	result, err := services.GetTopUsersByVolume(limitInt)
 	if err != nil {
@@ -37,18 +27,10 @@ func GetTopUsersByVolume(c echo.Context) error {
 }
 
 func GetTopBridgesByVolume(c echo.Context) error {
-	limit := c.QueryParam("limit")
-	if limit == "" {
-		limit = constants.DefaultLimit
-	}
+	limitInt := getLimit(c)
 	chain := c.QueryParam("chain")
 	if chain == "" {
 		chain = constants.DefaultChain
-	}
-
-	limitInt, err := strconv.Atoi(limit)
-	if err != nil {
-		return err
 	}
 
 	result, err := services.GetTopBridgesByVolume(chain, limitInt)
@@ -60,15 +42,7 @@ func GetTopBridgesByVolume(c echo.Context) error {
 }
 
 func GetTopSourceChainsByVolume(c echo.Context) error {
-	limit := c.QueryParam("limit")
-	if limit == "" {
-		limit = constants.DefaultLimit
-	}
-
-	limitInt, err := strconv.Atoi(limit)
-	if err != nil {
-		return err
-	}
+	limitInt := getLimit(c)
 
 	result, err := services.GetTopSourceChainsByVolume(limitInt)
 	if err != nil {
@@ -79,15 +53,7 @@ func GetTopSourceChainsByVolume(c echo.Context) error {
 }
 
 func GetTopDestinationChainsByVolume(c echo.Context) error {
-	limit := c.QueryParam("limit")
-	if limit == "" {
-		limit = "10"
-	}
-
-	limitInt, err := strconv.Atoi(limit)
-	if err != nil {
-		return err
-	}
+	limitInt := getLimit(c)
 
 	result, err := services.GetTopDestinationChainsByVolume(limitInt)
 	if err != nil {
@@ -98,15 +64,7 @@ func GetTopDestinationChainsByVolume(c echo.Context) error {
 }
 
 func GetTopPathsByVolume(c echo.Context) error {
-	limit := c.QueryParam("limit")
-	if limit == "" {
-		limit = constants.DefaultLimit
-	}
-
-	limitInt, err := strconv.Atoi(limit)
-	if err != nil {
-		return err
-	}
+	limitInt := getLimit(c)
 
 	result, err := services.GetTopPathsByVolume(limitInt)
 	if err != nil {

@@ -44,3 +44,33 @@ func validateTimeBucketInterval(bucket string) bool {
 	}
 	return false
 }
+
+// mergeSortedEntries merges two sorted slices of Entry
+func mergeSortedStats[T any](a, b []T, compare func(a, b T) int, merge func(a, b T) T) []T {
+	var result []T
+	i, j := 0, 0
+
+	for i < len(a) && j < len(b) {
+		if compare(a[i], b[j]) == 0 {
+			result = append(result, merge(a[i], b[j]))
+			i++
+			j++
+		} else if compare(a[i], b[j]) < 0 {
+			result = append(result, a[i])
+			i++
+		} else {
+			result = append(result, b[j])
+			j++
+		}
+	}
+
+	// Append any remaining entries
+	for ; i < len(a); i++ {
+		result = append(result, a[i])
+	}
+	for ; j < len(b); j++ {
+		result = append(result, b[j])
+	}
+
+	return result
+}
