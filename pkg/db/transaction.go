@@ -2,6 +2,7 @@ package db
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/scalarorg/scalar-service/pkg/types"
 )
@@ -39,6 +40,11 @@ func StatTransactionByDestinationChain(limit int) ([]*types.ChainAmount, error) 
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch top transfer users: %w", err)
 	}
+	for _, stat := range stats {
+		if !strings.HasPrefix(stat.Chain, "evm|") {
+			stat.Chain = "evm|" + stat.Chain
+		}
+	}
 	return stats, nil
 }
 
@@ -57,6 +63,11 @@ func StatTransactionByPath(limit int) ([]*types.PathAmount, error) {
 	err := DB.Indexer.Raw(query, limit).Scan(&stats).Error
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch top transfer users: %w", err)
+	}
+	for _, stat := range stats {
+		if !strings.HasPrefix(stat.DestinationChain, "evm|") {
+			stat.DestinationChain = "evm|" + stat.DestinationChain
+		}
 	}
 	return stats, nil
 }

@@ -10,9 +10,17 @@ func StatTransactionBySourceChain(limit int) ([]*types.ChainAmount, error) {
 }
 
 func StatTransactionByDestinationChain(limit int) ([]*types.ChainAmount, error) {
-	return db.StatTransactionByDestinationChain(limit)
+	stats, err := db.StatTransactionByDestinationChain(limit)
+	if err != nil {
+		return nil, err
+	}
+	return stats, nil
 }
 
 func StatTransactionByPath(limit int) ([]*types.PathAmount, error) {
-	return db.StatTransactionByPath(limit)
+	stats, err := db.StatTransactionByPath(limit)
+	if err != nil {
+		return nil, err
+	}
+	return stats, nil
 }

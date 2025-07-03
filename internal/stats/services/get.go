@@ -242,7 +242,7 @@ func GetVolumesStats(ctx context.Context, opts *StatsOpts) ([]*StatsPayload, err
 
 func GetActiveUsersStats(ctx context.Context, opts *StatsOpts) ([]*StatsPayload, error) {
 	//tokenSentSats, err := db.GetTokenStats(opts.TimeBucket)
-	tokenSentSats, err := db.GetActiveUsersByTimeBucket(opts.TimeBucket)
+	tokenSentSats, err := db.GetActiveUsersByTimeBucket(opts.TimeBucket, opts.Limit)
 	if err != nil {
 		return nil, err
 	}
