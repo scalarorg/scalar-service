@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"fmt"
 	"net/http"
 
 	"github.com/labstack/echo/v4"
@@ -17,8 +16,6 @@ func Get(c echo.Context) error {
 	if err := utils.BindAndValidate(c, &req); err != nil {
 		return err
 	}
-
-	fmt.Println("req: ", req)
 
 	tx, err := services.Get(ctx, &req)
 	if err != nil {

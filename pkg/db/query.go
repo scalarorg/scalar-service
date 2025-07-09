@@ -44,7 +44,8 @@ func BuildTokenSentsBaseQuery(db *gorm.DB, extendWhereClause func(db *gorm.DB)) 
             ce.tx_hash as executed_tx_hash,
             ce.block_number as executed_block_number,
             ce.address as executed_address,
-            to_timestamp(dbh.block_time) as executed_block_time
+            to_timestamp(dbh.block_time) as executed_block_time,
+			dbh.block_time AS block_time
         `)
 	extendWhereClause(query)
 	// return query.Joins("LEFT JOIN token_sent_approveds tsa ON ts.event_id = tsa.event_id").
@@ -86,7 +87,7 @@ func AggregateCrossChainTxs(ctx context.Context, query *gorm.DB, size, offset in
 	}
 
 	err := query.
-		Order("block_time DESC").
+		Order("block_number DESC").
 		Offset(offset).
 		Limit(size).
 		Find(&results).Error
@@ -166,11 +167,12 @@ func ListRedeemTxs(ctx context.Context, size, offset int) ([]BaseCrossChainTxRes
             brt.tx_hash as executed_tx_hash,
             brt.block_number as executed_block_number,
             brt.custodian_group_uid as executed_address,
-			to_timestamp(sbh.block_time) as source_created_at,
-            to_timestamp(brt.block_time) as executed_created_at
+			to_timestamp(dbh.block_time) as source_created_at,
+            to_timestamp(brt.block_time) as executed_created_at,
+			dbh.block_time AS block_time
         `).Where("ert.destination_chain = ?", config.Env.BITCOIN_CHAIN_ID).
 		Joins("LEFT JOIN btc_redeem_txes brt ON ert.custodian_group_uid = brt.custodian_group_uid AND ert.session_sequence = brt.session_sequence").
-		Joins("LEFT JOIN block_headers sbh ON brt.chain = sbh.chain AND brt.block_number = sbh.block_number")
+		Joins("LEFT JOIN block_headers dbh ON ert.source_chain = dbh.chain AND ert.block_number = dbh.block_number")
 
 	return AggregateCrossChainTxs(ctx, query, size, offset)
 }
