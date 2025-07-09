@@ -95,6 +95,11 @@ func AggregateCrossChainTxs(ctx context.Context, query *gorm.DB, size, offset in
 	if err != nil {
 		return nil, 0, err
 	}
+	for i, result := range results {
+		if result.ExecutedTxHash != "" {
+			results[i].Status = string(chains.TokenSentStatusSuccess)
+		}
+	}
 	return results, int(totalCount), nil
 }
 
@@ -134,11 +139,6 @@ func ListBridgeTxs(ctx context.Context, size, offset int) ([]BaseCrossChainTxRes
 			log.Printf("error converting script pubkey to address: %s, %s, %v\n", result.SourceAddress, result.SourceChain, err)
 		} else {
 			results[i].SourceAddress = address.String()
-		}
-		if result.ExecutedTxHash != "" {
-			results[i].Status = string(chains.TokenSentStatusSuccess)
-		} else {
-			results[i].Status = string(chains.TokenSentStatusPending)
 		}
 	}
 
