@@ -3,10 +3,38 @@ package db
 import (
 	"context"
 	"fmt"
+	"log"
 
+	"github.com/scalarorg/data-models/chains"
 	"github.com/scalarorg/scalar-service/config"
+	"github.com/scalarorg/scalar-service/pkg/utils"
 	"gorm.io/gorm"
 )
+
+func BuildVaultTxsBaseQuery(db *gorm.DB, extendWhereClause func(db *gorm.DB)) *gorm.DB {
+	query := db.Table("vault_transactions vt").
+		Select(`
+            vt.tx_hash,
+            vt.block_number,
+            vt.timestamp as block_time,
+			vt.chain as source_chain,
+            vt.staker_script_pubkey as source_address,
+            vt.destination_chain,
+			vt.destination_recipient_address as destination_address,
+			vt.destination_token_address as token_contract_address,
+			vt.amount,
+            ce.command_id,
+            ce.tx_hash as executed_tx_hash,
+            ce.block_number as executed_block_number,
+            ce.address as executed_address,
+            to_timestamp(dbh.block_time) as executed_block_time
+        `)
+	extendWhereClause(query)
+	// return query.Joins("LEFT JOIN token_sent_approveds tsa ON ts.event_id = tsa.event_id").
+	// 	Joins("LEFT JOIN command_executeds ce ON tsa.command_id = ce.command_id")
+	return query.Joins("LEFT JOIN command_executeds ce ON vt.tx_hash = ce.command_id").
+		Joins("LEFT JOIN block_headers dbh ON ce.source_chain = dbh.chain AND ce.block_number = dbh.block_number")
+}
 
 func BuildTokenSentsBaseQuery(db *gorm.DB, extendWhereClause func(db *gorm.DB)) *gorm.DB {
 	query := db.Table("token_sents ts").
@@ -22,7 +50,7 @@ func BuildTokenSentsBaseQuery(db *gorm.DB, extendWhereClause func(db *gorm.DB)) 
 	// return query.Joins("LEFT JOIN token_sent_approveds tsa ON ts.event_id = tsa.event_id").
 	// 	Joins("LEFT JOIN command_executeds ce ON tsa.command_id = ce.command_id")
 	return query.Joins("LEFT JOIN command_executeds ce ON ts.tx_hash = ce.command_id").
-		Joins("LEFT JOIN block_headers dbh ON ce.source_chain = dbh.chain AND ce.block_number = dbh.block_number")
+		Joins("LEFT JOIN block_headers dbh ON ts.source_chain = dbh.chain AND ts.block_number = dbh.block_number")
 }
 
 func BuildContractCallWithTokenBaseQuery(db *gorm.DB, extendWhereClause func(db *gorm.DB)) *gorm.DB {
@@ -66,12 +94,11 @@ func AggregateCrossChainTxs(ctx context.Context, query *gorm.DB, size, offset in
 	if err != nil {
 		return nil, 0, err
 	}
-
 	return results, int(totalCount), nil
 }
 
 func ListTransferTxs(ctx context.Context, size, offset int) ([]BaseCrossChainTxResult, int, error) {
-	query := BuildTokenSentsBaseQuery(DB.Relayer, func(db *gorm.DB) {
+	query := BuildTokenSentsBaseQuery(DB.Indexer, func(db *gorm.DB) {
 		db.Where("ts.source_chain <> ?", config.Env.BITCOIN_CHAIN_ID)
 	})
 
@@ -81,7 +108,7 @@ func ListTransferTxs(ctx context.Context, size, offset int) ([]BaseCrossChainTxR
 func GetTransferTx(ctx context.Context, txHash string) (*BaseCrossChainTxResult, error) {
 	var result BaseCrossChainTxResult
 
-	query := BuildTokenSentsBaseQuery(DB.Relayer, func(db *gorm.DB) {
+	query := BuildTokenSentsBaseQuery(DB.Indexer, func(db *gorm.DB) {
 		db.Where("ts.source_chain <> ?", config.Env.BITCOIN_CHAIN_ID)
 	})
 
@@ -90,30 +117,49 @@ func GetTransferTx(ctx context.Context, txHash string) (*BaseCrossChainTxResult,
 	return &result, err
 }
 
+// Get all bridge txs from indexer's vault_transactions table
 func ListBridgeTxs(ctx context.Context, size, offset int) ([]BaseCrossChainTxResult, int, error) {
-	query := BuildTokenSentsBaseQuery(DB.Relayer, func(db *gorm.DB) {
-		db.Where("ts.source_chain = ?", config.Env.BITCOIN_CHAIN_ID)
+	query := BuildVaultTxsBaseQuery(DB.Indexer, func(db *gorm.DB) {
+		db.Where("vt.chain = ?", config.Env.BITCOIN_CHAIN_ID)
 	})
+	results, count, err := AggregateCrossChainTxs(ctx, query, size, offset)
+	if err != nil {
+		return nil, 0, err
+	}
 
-	return AggregateCrossChainTxs(ctx, query, size, offset)
+	for i, result := range results {
+		address, err := utils.ScriptPubKeyToAddress(result.SourceAddress, result.SourceChain)
+		if err != nil {
+			log.Printf("error converting script pubkey to address: %s, %s, %v\n", result.SourceAddress, result.SourceChain, err)
+		} else {
+			results[i].SourceAddress = address.String()
+		}
+		if result.ExecutedTxHash != "" {
+			results[i].Status = string(chains.TokenSentStatusSuccess)
+		} else {
+			results[i].Status = string(chains.TokenSentStatusPending)
+		}
+	}
+
+	return results, count, nil
 }
 
 func GetBridgeTx(ctx context.Context, txHash string) (*BaseCrossChainTxResult, error) {
 	var result BaseCrossChainTxResult
 
-	query := BuildTokenSentsBaseQuery(DB.Relayer, func(db *gorm.DB) {
-		db.Where("ts.source_chain = ?", config.Env.BITCOIN_CHAIN_ID)
+	query := BuildVaultTxsBaseQuery(DB.Indexer, func(db *gorm.DB) {
+		db.Where("vt.chain = ?", config.Env.BITCOIN_CHAIN_ID)
 	})
 
 	fmt.Println("query", query)
 
-	err := query.Where("ts.tx_hash = ?", txHash).First(&result).Error
+	err := query.Where("vt.tx_hash = ?", txHash).First(&result).Error
 
 	return &result, err
 }
 
 func ListRedeemTxs(ctx context.Context, size, offset int) ([]BaseCrossChainTxResult, int, error) {
-	query := DB.Relayer.Table("evm_redeem_txes ert").
+	query := DB.Indexer.Table("evm_redeem_txes ert").
 		Select(`
             ert.*,
             brt.tx_hash as command_id,
@@ -132,7 +178,7 @@ func ListRedeemTxs(ctx context.Context, size, offset int) ([]BaseCrossChainTxRes
 func GetRedeemTx(ctx context.Context, txHash string) (*BaseCrossChainTxResult, error) {
 	var result BaseCrossChainTxResult
 
-	query := BuildContractCallWithTokenBaseQuery(DB.Relayer, func(db *gorm.DB) {
+	query := BuildContractCallWithTokenBaseQuery(DB.Indexer, func(db *gorm.DB) {
 		db.Where("ccwtk.destination_chain = ?", config.Env.BITCOIN_CHAIN_ID)
 	})
 
