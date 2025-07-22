@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/scalarorg/data-models/chains"
 	"github.com/scalarorg/scalar-service/config"
@@ -28,7 +29,8 @@ func BuildVaultTxsBaseQuery(db *gorm.DB, extendWhereClause func(db *gorm.DB)) *g
             ce.block_number as executed_block_number,
             ce.address as executed_address,
             to_timestamp(dbh.block_time) as executed_block_time
-        `)
+        `).
+		Where("vt.timestamp IS NOT NULL AND vt.amount > 0")
 	extendWhereClause(query)
 	// return query.Joins("LEFT JOIN token_sent_approveds tsa ON ts.event_id = tsa.event_id").
 	// 	Joins("LEFT JOIN command_executeds ce ON tsa.command_id = ce.command_id")
@@ -46,7 +48,8 @@ func BuildTokenSentsBaseQuery(db *gorm.DB, extendWhereClause func(db *gorm.DB)) 
             ce.address as executed_address,
             to_timestamp(dbh.block_time) as executed_block_time,
 			dbh.block_time AS block_time
-        `)
+        `).
+		Where("ts.block_time IS NOT NULL AND ts.amount > 0")
 	extendWhereClause(query)
 	// return query.Joins("LEFT JOIN token_sent_approveds tsa ON ts.event_id = tsa.event_id").
 	// 	Joins("LEFT JOIN command_executeds ce ON tsa.command_id = ce.command_id")
@@ -63,7 +66,8 @@ func BuildContractCallWithTokenBaseQuery(db *gorm.DB, extendWhereClause func(db 
             ce.block_number as executed_block_number,
             ce.address as executed_address,
             ce.created_at as executed_created_at
-        `)
+        `).
+		Where("ccwtk.block_number IS NOT NULL AND ccwtk.amount > 0")
 	extendWhereClause(query)
 	// return query.Joins("LEFT JOIN contract_call_approved_with_mints ccawm ON ccwtk.event_id = ccawm.event_id").
 	// 	Joins("LEFT JOIN command_executeds ce ON ccawm.command_id = ce.command_id")
@@ -75,6 +79,10 @@ func AggregateCrossChainTxs(ctx context.Context, query *gorm.DB, size, offset in
 
 	var totalCount int64
 
+	// Add timeout to context if not already set
+	ctxWithTimeout, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
 	if size <= 0 {
 		size = 10
 	}
@@ -82,11 +90,11 @@ func AggregateCrossChainTxs(ctx context.Context, query *gorm.DB, size, offset in
 		offset = 0
 	}
 
-	if err := query.Count(&totalCount).Error; err != nil {
+	if err := query.WithContext(ctxWithTimeout).Count(&totalCount).Error; err != nil {
 		return nil, 0, err
 	}
 
-	err := query.
+	err := query.WithContext(ctxWithTimeout).
 		Order("block_number DESC").
 		Offset(offset).
 		Limit(size).
@@ -104,23 +112,37 @@ func AggregateCrossChainTxs(ctx context.Context, query *gorm.DB, size, offset in
 }
 
 func ListTransferTxs(ctx context.Context, size, offset int) ([]BaseCrossChainTxResult, int, error) {
+	// Add timeout to context if not already set
+	ctxWithTimeout, cancel := context.WithTimeout(ctx, 45*time.Second)
+	defer cancel()
+	
 	query := BuildTokenSentsBaseQuery(DB.Indexer, func(db *gorm.DB) {
 		db.Where("ts.source_chain <> ?", config.Env.BITCOIN_CHAIN_ID)
 	})
 
-	return AggregateCrossChainTxs(ctx, query, size, offset)
+	return AggregateCrossChainTxs(ctxWithTimeout, query, size, offset)
 }
 
 func GetTransferTx(ctx context.Context, txHash string) (*BaseCrossChainTxResult, error) {
+	// Add timeout to context if not already set
+	ctxWithTimeout, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+	
 	var result BaseCrossChainTxResult
 
 	query := BuildTokenSentsBaseQuery(DB.Indexer, func(db *gorm.DB) {
 		db.Where("ts.source_chain <> ?", config.Env.BITCOIN_CHAIN_ID)
 	})
 
-	err := query.Where("ts.tx_hash = ?", txHash).First(&result).Error
+	err := query.WithContext(ctxWithTimeout).
+		Where("ts.tx_hash = ? AND ts.tx_hash IS NOT NULL AND ts.tx_hash != ''", txHash).
+		First(&result).Error
 
-	return &result, err
+	if err != nil {
+		return nil, fmt.Errorf("failed to get transfer transaction: %w", err)
+	}
+
+	return &result, nil
 }
 
 // Get all bridge txs from indexer's vault_transactions table
@@ -146,20 +168,32 @@ func ListBridgeTxs(ctx context.Context, size, offset int) ([]BaseCrossChainTxRes
 }
 
 func GetBridgeTx(ctx context.Context, txHash string) (*BaseCrossChainTxResult, error) {
+	// Add timeout to context if not already set
+	ctxWithTimeout, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+	
 	var result BaseCrossChainTxResult
 
 	query := BuildVaultTxsBaseQuery(DB.Indexer, func(db *gorm.DB) {
 		db.Where("vt.chain = ?", config.Env.BITCOIN_CHAIN_ID)
 	})
 
-	fmt.Println("query", query)
+	err := query.WithContext(ctxWithTimeout).
+		Where("vt.tx_hash = ? AND vt.tx_hash IS NOT NULL AND vt.tx_hash != ''", txHash).
+		First(&result).Error
 
-	err := query.Where("vt.tx_hash = ?", txHash).First(&result).Error
+	if err != nil {
+		return nil, fmt.Errorf("failed to get bridge transaction: %w", err)
+	}
 
-	return &result, err
+	return &result, nil
 }
 
 func ListRedeemTxs(ctx context.Context, size, offset int) ([]BaseCrossChainTxResult, int, error) {
+	// Add timeout to context if not already set
+	ctxWithTimeout, cancel := context.WithTimeout(ctx, 45*time.Second)
+	defer cancel()
+	
 	query := DB.Indexer.Table("evm_redeem_txes ert").
 		Select(`
             ert.*,
@@ -174,17 +208,27 @@ func ListRedeemTxs(ctx context.Context, size, offset int) ([]BaseCrossChainTxRes
 		Joins("LEFT JOIN btc_redeem_txes brt ON ert.custodian_group_uid = brt.custodian_group_uid AND ert.session_sequence = brt.session_sequence").
 		Joins("LEFT JOIN block_headers dbh ON ert.source_chain = dbh.chain AND ert.block_number = dbh.block_number")
 
-	return AggregateCrossChainTxs(ctx, query, size, offset)
+	return AggregateCrossChainTxs(ctxWithTimeout, query, size, offset)
 }
 
 func GetRedeemTx(ctx context.Context, txHash string) (*BaseCrossChainTxResult, error) {
+	// Add timeout to context if not already set
+	ctxWithTimeout, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+	
 	var result BaseCrossChainTxResult
 
 	query := BuildContractCallWithTokenBaseQuery(DB.Indexer, func(db *gorm.DB) {
 		db.Where("ccwtk.destination_chain = ?", config.Env.BITCOIN_CHAIN_ID)
 	})
 
-	err := query.Where("ccwtk.tx_hash = ?", txHash).First(&result).Error
+	err := query.WithContext(ctxWithTimeout).
+		Where("ccwtk.tx_hash = ? AND ccwtk.tx_hash IS NOT NULL AND ccwtk.tx_hash != ''", txHash).
+		First(&result).Error
 
-	return &result, err
+	if err != nil {
+		return nil, fmt.Errorf("failed to get redeem transaction: %w", err)
+	}
+
+	return &result, nil
 }

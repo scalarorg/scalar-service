@@ -46,7 +46,7 @@ func GetStats(ctx context.Context, opts *StatsOpts) (*StatsResponse, error) {
 		return nil, err
 	}
 	response := &StatsResponse{}
-	tokenSentSats, err := db.GetTokenStats(opts.TimeBucket)
+	tokenSentSats, err := db.GetTokenStats(opts.TimeBucket, opts.Limit)
 	if err != nil {
 		return nil, err
 	}
