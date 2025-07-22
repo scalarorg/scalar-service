@@ -69,8 +69,8 @@ type DestinationDocument struct {
 
 type BaseCrossChainTxResult struct {
 	// TokenSent fields
-	EventID              string `gorm:"column:event_id"`
 	TxHash               string `gorm:"column:tx_hash"`
+	EventID              string `gorm:"column:event_id"`
 	BlockNumber          uint64 `gorm:"column:block_number"`
 	BlockTime            uint64 `gorm:"column:block_time"`
 	SourceChain          string `gorm:"column:source_chain"`

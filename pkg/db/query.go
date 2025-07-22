@@ -35,7 +35,7 @@ func BuildVaultTxsBaseQuery(db *gorm.DB, extendWhereClause func(db *gorm.DB)) *g
 	// return query.Joins("LEFT JOIN token_sent_approveds tsa ON ts.event_id = tsa.event_id").
 	// 	Joins("LEFT JOIN command_executeds ce ON tsa.command_id = ce.command_id")
 	return query.Joins("LEFT JOIN command_executeds ce ON vt.tx_hash = ce.command_id").
-		Joins("LEFT JOIN block_headers dbh ON ce.source_chain = dbh.chain AND ce.block_number = dbh.block_number")
+		Joins("LEFT JOIN block_headers dbh ON ce.source_chain = dbh.chain AND ce.block_number = dbh.block_number").Order("vt.timestamp DESC")
 }
 
 func BuildTokenSentsBaseQuery(db *gorm.DB, extendWhereClause func(db *gorm.DB)) *gorm.DB {
@@ -54,7 +54,7 @@ func BuildTokenSentsBaseQuery(db *gorm.DB, extendWhereClause func(db *gorm.DB)) 
 	// return query.Joins("LEFT JOIN token_sent_approveds tsa ON ts.event_id = tsa.event_id").
 	// 	Joins("LEFT JOIN command_executeds ce ON tsa.command_id = ce.command_id")
 	return query.Joins("LEFT JOIN command_executeds ce ON ts.tx_hash = ce.command_id").
-		Joins("LEFT JOIN block_headers dbh ON ts.source_chain = dbh.chain AND ts.block_number = dbh.block_number")
+		Joins("LEFT JOIN block_headers dbh ON ts.source_chain = dbh.chain AND ts.block_number = dbh.block_number").Order("ts.timestamp DESC")
 }
 
 func BuildContractCallWithTokenBaseQuery(db *gorm.DB, extendWhereClause func(db *gorm.DB)) *gorm.DB {
@@ -71,7 +71,7 @@ func BuildContractCallWithTokenBaseQuery(db *gorm.DB, extendWhereClause func(db 
 	extendWhereClause(query)
 	// return query.Joins("LEFT JOIN contract_call_approved_with_mints ccawm ON ccwtk.event_id = ccawm.event_id").
 	// 	Joins("LEFT JOIN command_executeds ce ON ccawm.command_id = ce.command_id")
-	return query.Joins("LEFT JOIN command_executeds ce ON ccwtk.tx_hash = ce.command_id")
+	return query.Joins("LEFT JOIN command_executeds ce ON ccwtk.tx_hash = ce.command_id").Order("ccwtk.block_number DESC")
 }
 
 func AggregateCrossChainTxs(ctx context.Context, query *gorm.DB, size, offset int) ([]BaseCrossChainTxResult, int, error) {
@@ -115,7 +115,7 @@ func ListTransferTxs(ctx context.Context, size, offset int) ([]BaseCrossChainTxR
 	// Add timeout to context if not already set
 	ctxWithTimeout, cancel := context.WithTimeout(ctx, 45*time.Second)
 	defer cancel()
-	
+
 	query := BuildTokenSentsBaseQuery(DB.Indexer, func(db *gorm.DB) {
 		db.Where("ts.source_chain <> ?", config.Env.BITCOIN_CHAIN_ID)
 	})
@@ -127,7 +127,7 @@ func GetTransferTx(ctx context.Context, txHash string) (*BaseCrossChainTxResult,
 	// Add timeout to context if not already set
 	ctxWithTimeout, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
-	
+
 	var result BaseCrossChainTxResult
 
 	query := BuildTokenSentsBaseQuery(DB.Indexer, func(db *gorm.DB) {
@@ -171,7 +171,7 @@ func GetBridgeTx(ctx context.Context, txHash string) (*BaseCrossChainTxResult, e
 	// Add timeout to context if not already set
 	ctxWithTimeout, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
-	
+
 	var result BaseCrossChainTxResult
 
 	query := BuildVaultTxsBaseQuery(DB.Indexer, func(db *gorm.DB) {
@@ -193,7 +193,7 @@ func ListRedeemTxs(ctx context.Context, size, offset int) ([]BaseCrossChainTxRes
 	// Add timeout to context if not already set
 	ctxWithTimeout, cancel := context.WithTimeout(ctx, 45*time.Second)
 	defer cancel()
-	
+
 	query := DB.Indexer.Table("evm_redeem_txes ert").
 		Select(`
             ert.*,
@@ -215,7 +215,7 @@ func GetRedeemTx(ctx context.Context, txHash string) (*BaseCrossChainTxResult, e
 	// Add timeout to context if not already set
 	ctxWithTimeout, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
-	
+
 	var result BaseCrossChainTxResult
 
 	query := BuildContractCallWithTokenBaseQuery(DB.Indexer, func(db *gorm.DB) {
