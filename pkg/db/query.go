@@ -54,7 +54,7 @@ func BuildTokenSentsBaseQuery(db *gorm.DB, extendWhereClause func(db *gorm.DB)) 
 	// return query.Joins("LEFT JOIN token_sent_approveds tsa ON ts.event_id = tsa.event_id").
 	// 	Joins("LEFT JOIN command_executeds ce ON tsa.command_id = ce.command_id")
 	return query.Joins("LEFT JOIN command_executeds ce ON ts.tx_hash = ce.command_id").
-		Joins("LEFT JOIN block_headers dbh ON ts.source_chain = dbh.chain AND ts.block_number = dbh.block_number").Order("ts.timestamp DESC")
+		Joins("LEFT JOIN block_headers dbh ON ts.source_chain = dbh.chain AND ts.block_number = dbh.block_number").Order("ts.block_number DESC")
 }
 
 func BuildContractCallWithTokenBaseQuery(db *gorm.DB, extendWhereClause func(db *gorm.DB)) *gorm.DB {
